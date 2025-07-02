@@ -58,27 +58,27 @@ jobs:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache
           pull-request-cache: true
 
-      - name: Build and load Docker image
-        id: build
+      - name: Build and test image
+        id: build-and-test
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile.python
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           load: true
           push: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
 
       - name: Run tests
         run: |
           chmod +x ./test.sh
-          ./test.sh $(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
+          ./test.sh ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
 
-      - name: Push Docker image
+      - name: Build and push multi-platform image
         if: github.event_name != 'pull_request'
+        id: build-and-push
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -95,5 +95,5 @@ jobs:
         uses: actions/attest-build-provenance@v1
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ steps.build-and-push.outputs.digest }}
           push-to-registry: true
