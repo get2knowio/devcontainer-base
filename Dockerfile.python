@@ -1,0 +1,250 @@
+########################################################################
+#  Development Container - Python Base Image
+#  
+#  A comprehensive development environment built on Ubuntu 24.04 LTS
+#  
+#  🐚 Shell & Prompt:
+#    • Zsh with Zinit plugin manager for fast loading
+#    • Starship - minimal, blazing-fast, infinitely customizable prompt
+#    • Enhanced completions for all installed tools
+#  
+#  🐍 Python Ecosystem:
+#    • Python 3.12 with development headers
+#    • Poetry - modern dependency management and packaging
+#    • pip and venv support
+#  
+#  ☁️ Cloud & Infrastructure:
+#    • AWS CLI v2 - unified command line interface for AWS services
+#  
+#  🌐 Node.js Ecosystem:
+#    • Node.js LTS via nvm (Node Version Manager)
+#    • Gemini CLI - Google's generative AI command line tool
+#    • Claude Code - Anthropic's AI assistant for developers
+#  
+#  🛠️ Modern CLI Tools:
+#    • eza - modern replacement for ls with colors and Git integration
+#    • fzf - command-line fuzzy finder
+#    • bat - syntax-highlighted file viewer (cat clone)
+#    • ripgrep - ultra-fast text search tool
+#    • fd-find - simple, fast alternative to find
+#    • jq - lightweight command-line JSON processor
+#  
+#  📁 Workspace: /workspace
+########################################################################
+
+FROM ubuntu:24.04
+
+LABEL maintainer="you@example.com"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NVM_VERSION=0.40.3
+ENV POETRY_HOME=/opt/poetry
+
+# Set up user environment variables
+ENV USERNAME=devuser
+ENV USER_UID=1000
+ENV USER_GID=1000
+ENV USER_HOME=/home/$USERNAME
+ENV NVM_DIR=$USER_HOME/.nvm
+ENV PATH="$POETRY_HOME/bin:$NVM_DIR/versions/node/$(ls -1 $NVM_DIR/versions/node 2>/dev/null | tail -1)/bin:$PATH"
+
+# ------------------------------------------------------------------
+# Essential system packages and modern CLI tools
+# ------------------------------------------------------------------
+# Core packages:
+#   • zsh - Z shell with better features than bash
+#   • git - distributed version control system
+#   • curl, wget - HTTP clients for downloading files
+#   • unzip - archive extraction utility
+#   • ca-certificates - certificate authority certificates
+#   • fonts-powerline - special fonts for enhanced terminal display
+# 
+# Python development:
+#   • python3.12 - latest stable Python version
+#   • python3.12-venv - virtual environment support
+#   • python3.12-dev - headers for compiling Python extensions
+#   • python3-pip - package installer for Python
+#
+# Modern CLI replacements and tools:
+#   • eza - modern ls replacement with Git integration and colors
+#   • fzf - command-line fuzzy finder for interactive searching
+#   • bat - syntax-highlighted cat replacement
+#   • ripgrep - ultra-fast text search (grep replacement)
+#   • fd-find - intuitive find command replacement
+#   • jq - command-line JSON processor
+RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
+        zsh fzf bat ripgrep fd-find jq \
+        eza \
+        python3.12 python3.12-venv python3.12-dev python3-pip \
+        git curl wget unzip ca-certificates fonts-powerline \
+        sudo \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------------
+# Create non-root user with sudo access
+# ------------------------------------------------------------------
+# Creates a non-root user for security and best practices:
+#   • devuser with UID/GID 1000 (matches most host systems)
+#   • passwordless sudo access for development tasks
+#   • proper shell configuration (zsh)
+#   • group membership for common development tasks
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID --shell /bin/zsh --create-home $USERNAME \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99-$USERNAME \
+    && chmod 0440 /etc/sudoers.d/99-$USERNAME
+
+# ------------------------------------------------------------------
+# Starship - Cross-shell prompt
+# ------------------------------------------------------------------
+# Starship is a minimal, blazing-fast, and infinitely customizable 
+# prompt for any shell. It shows information you need while staying 
+# sleek and minimal. Features include:
+#   • Git status integration
+#   • Package version detection
+#   • Runtime environment indicators
+#   • Custom theming support
+#   • Language/framework detection
+# 
+# Configuration includes:
+#   • 2000ms command timeout for better performance
+#   • Disabled container and docker_context modules (redundant in containers)
+RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
+
+RUN mkdir -p $USER_HOME/.config && \
+    echo 'command_timeout = 2000\n' \
+         '[container]\ndisabled = true\n' \
+         '[docker_context]\ndisabled = true' \
+    > $USER_HOME/.config/starship.toml
+
+# ------------------------------------------------------------------
+# Zinit - Fast Zsh plugin manager
+# ------------------------------------------------------------------
+# Zinit is a flexible and fast Zsh plugin manager that can load plugins
+# asynchronously and in parallel. It provides:
+#   • Turbo mode for ultra-fast shell startup
+#   • Plugin loading optimization
+#   • Ice modifiers for fine-grained control
+#   • Extensive plugin ecosystem support
+RUN mkdir -p ~/.zinit && \
+    git clone https://github.com/zdharma-continuum/zinit.git ~/.zinit/bin
+
+# ------------------------------------------------------------------
+# Zsh configuration with plugins and completions
+# ------------------------------------------------------------------
+# Configures Zsh with productivity-enhancing plugins:
+#   • zsh-autosuggestions - fish-like autosuggestions based on history
+#   • zsh-completions - additional completion definitions
+#   • zsh-history-substring-search - fish-like history search
+# 
+# Includes modern aliases:
+#   • ls/ll/la - eza with colors and icons
+#   • History navigation with up/down arrows
+# 
+# Tool completions for:
+#   • AWS CLI v2 - comprehensive command completion
+#   • Poetry - Python dependency management
+#   • npm - Node.js package management
+RUN echo 'export ZINIT_HOME="$HOME/.zinit"'                          >> $USER_HOME/.zshrc && \
+    echo 'source "$ZINIT_HOME/bin/zinit.zsh"'                        >> $USER_HOME/.zshrc && \
+    echo 'zinit light zsh-users/zsh-autosuggestions'                 >> $USER_HOME/.zshrc && \
+    echo 'zinit light zsh-users/zsh-completions'                     >> $USER_HOME/.zshrc && \
+    echo 'zinit light zsh-users/zsh-history-substring-search'        >> $USER_HOME/.zshrc && \
+    echo 'autoload -U compinit && compinit'                          >> $USER_HOME/.zshrc && \
+    echo 'bindkey "^[[A" history-substring-search-up'                >> $USER_HOME/.zshrc && \
+    echo 'bindkey "^[[B" history-substring-search-down'              >> $USER_HOME/.zshrc && \
+    echo 'eval "$(starship init zsh)"'                               >> $USER_HOME/.zshrc && \
+    echo 'alias ls="eza --icons"'                                    >> $USER_HOME/.zshrc && \
+    echo 'alias ll="eza -l --icons"'                                 >> $USER_HOME/.zshrc && \
+    echo 'alias la="eza -la --icons"'                                >> $USER_HOME/.zshrc && \
+    echo 'export NVM_DIR="$HOME/.nvm"'                               >> $USER_HOME/.zshrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'           >> $USER_HOME/.zshrc && \
+    echo ''                                                           >> $USER_HOME/.zshrc && \
+    echo '# Tool completions'                                        >> $USER_HOME/.zshrc && \
+    echo 'complete -C "/usr/local/bin/aws_completer" aws'            >> $USER_HOME/.zshrc && \
+    echo 'fpath=(~/.zinit/completions $fpath)'                      >> $USER_HOME/.zshrc && \
+    echo 'if command -v npm >/dev/null 2>&1; then'                  >> $USER_HOME/.zshrc && \
+    echo '    eval "$(npm completion zsh)"'                          >> $USER_HOME/.zshrc && \
+    echo 'fi'                                                        >> $USER_HOME/.zshrc
+
+# Make Zsh the default shell for every RUN that follows
+SHELL ["/bin/zsh", "-c"]
+CMD ["zsh"]
+
+# ------------------------------------------------------------------
+# AWS CLI v2 - Amazon Web Services Command Line Interface
+# ------------------------------------------------------------------
+# AWS CLI v2 is the official command line interface for AWS services.
+# It provides:
+#   • Unified interface to all AWS services
+#   • Enhanced performance and stability over v1
+#   • Auto-completion support
+#   • Built-in pagination and output formatting
+#   • Session management and credential handling
+#   • Support for AWS SSO and modern authentication methods
+# 
+# Installation detects the target architecture and downloads the appropriate 
+# AWS CLI package for multi-architecture builds (amd64/arm64).
+ARG TARGETARCH
+RUN if [ "$TARGETARCH" = "amd64" ] || [ "$TARGETARCH" = "x86_64" ]; then \
+      curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"; \
+    elif [ "$TARGETARCH" = "arm64" ] || [ "$TARGETARCH" = "aarch64" ]; then \
+      curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"; \
+    else \
+      echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+    fi && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf awscliv2.zip aws/
+
+# ------------------------------------------------------------------
+# Poetry - Python dependency management and packaging tool
+# ------------------------------------------------------------------
+# Poetry is a modern Python dependency management and packaging tool that:
+#   • Manages dependencies and virtual environments automatically
+#   • Uses pyproject.toml for modern Python project configuration
+#   • Provides deterministic dependency resolution
+#   • Simplifies package building and publishing
+#   • Integrates with version control and CI/CD systems
+#
+# Installed to /opt/poetry and symlinked to /usr/local/bin for global access
+# Shell completion is pre-generated during build for faster startup
+RUN curl -sSL https://install.python-poetry.org | python3 && \
+    ln -s $POETRY_HOME/bin/poetry /usr/local/bin/poetry
+
+# Generate Poetry completion during build for faster shell startup
+RUN mkdir -p $USER_HOME/.zinit/completions && \
+    poetry completions zsh > $USER_HOME/.zinit/completions/_poetry
+
+# Set ownership of all user files to devuser
+RUN chown -R $USERNAME:$USERNAME $USER_HOME
+
+# Switch to non-root user for remaining operations
+USER $USERNAME
+
+# ------------------------------------------------------------------------------
+# Node.js LTS with AI development tools
+# ------------------------------------------------------------------------------
+# Node Version Manager (nvm) for flexible Node.js management:
+#   • Installs and manages multiple Node.js versions
+#   • Automatically switches versions per project
+#   • Provides the latest LTS (Long Term Support) version
+#
+# AI-powered development tools:
+#   • @google/gemini-cli - Google's Gemini AI assistant for development
+#     Provides AI-powered code generation, explanation, and assistance
+#   • @anthropic-ai/claude-code - Anthropic's Claude AI for development
+#     Advanced AI assistant for coding, debugging, and technical tasks
+#
+# Both tools enable AI-assisted development workflows directly from the terminal
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.sh | bash && \
+    export NVM_DIR="$HOME/.nvm" && \
+    . "$NVM_DIR/nvm.sh" && \
+    nvm install --lts && \
+    nvm alias default 'lts/*' && \
+    npm install -g @google/gemini-cli && \
+    npm install -g @anthropic-ai/claude-code
+
+# ------------------------------------------------------------------
+# Ready for work!
+# ------------------------------------------------------------------
+WORKDIR /workspace
