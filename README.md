@@ -33,3 +33,18 @@ To leverage this base image in your own project, you can create a `.devcontainer
 - **Docker Installed**: Ensure Docker is installed and running on your machine.
 - **VS Code Dev Containers Extension**: Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) in Visual Studio Code.
 - **Poetry**: This image assumes that you are using [Poetry](https://python-poetry.org/) for dependency management. Ensure your project is configured with a `pyproject.toml` file.
+
+## Local Testing
+To test the image locally before pushing changes, you can use the provided test script:
+
+```bash
+./test.sh
+```
+
+This script will:
+- Build the Docker image locally
+- Run a series of tests to verify the image works correctly
+- Check that all essential tools and dependencies are properly installed
+
+## Build and Push Workflow
+This repository includes a GitHub Actions workflow (`.github/workflows/docker-build-push.yml`) to automatically build and push the Docker image to GHCR on changes to the `main` or `develop` branches, or when a new tag is created.

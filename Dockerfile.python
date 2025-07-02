@@ -42,8 +42,8 @@ ENV POETRY_HOME=/opt/poetry
 
 # Set up user environment variables
 ENV USERNAME=devuser
-ENV USER_UID=1000
-ENV USER_GID=1000
+ENV USER_UID=1001
+ENV USER_GID=1001
 ENV USER_HOME=/home/$USERNAME
 ENV NVM_DIR=$USER_HOME/.nvm
 ENV PATH="$POETRY_HOME/bin:$NVM_DIR/versions/node/$(ls -1 $NVM_DIR/versions/node 2>/dev/null | tail -1)/bin:$PATH"
@@ -78,13 +78,15 @@ RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
         python3.12 python3.12-venv python3.12-dev python3-pip \
         git curl wget unzip ca-certificates fonts-powerline \
         sudo \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/batcat /usr/bin/bat \
+    && ln -sf /usr/bin/fdfind /usr/bin/fd
 
 # ------------------------------------------------------------------
 # Create non-root user with sudo access
 # ------------------------------------------------------------------
 # Creates a non-root user for security and best practices:
-#   • devuser with UID/GID 1000 (matches most host systems)
+#   • devuser with UID/GID 1001 (avoids conflicts with existing users)
 #   • passwordless sudo access for development tasks
 #   • proper shell configuration (zsh)
 #   • group membership for common development tasks
@@ -165,9 +167,6 @@ RUN echo 'export ZINIT_HOME="$HOME/.zinit"'                          >> $USER_HO
     echo 'if command -v npm >/dev/null 2>&1; then'                  >> $USER_HOME/.zshrc && \
     echo '    eval "$(npm completion zsh)"'                          >> $USER_HOME/.zshrc && \
     echo 'fi'                                                        >> $USER_HOME/.zshrc
-
-# Make Zsh the default shell for every RUN that follows
-SHELL ["/bin/zsh", "-c"]
 CMD ["zsh"]
 
 # ------------------------------------------------------------------
@@ -218,6 +217,9 @@ RUN mkdir -p $USER_HOME/.zinit/completions && \
 # Set ownership of all user files to devuser
 RUN chown -R $USERNAME:$USERNAME $USER_HOME
 
+# Make Zsh the default shell for remaining operations
+SHELL ["/bin/zsh", "-c"]
+
 # Switch to non-root user for remaining operations
 USER $USERNAME
 
@@ -236,6 +238,7 @@ USER $USERNAME
 #     Advanced AI assistant for coding, debugging, and technical tasks
 #
 # Both tools enable AI-assisted development workflows directly from the terminal
+SHELL ["/bin/bash", "-c"]
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.sh | bash && \
     export NVM_DIR="$HOME/.nvm" && \
     . "$NVM_DIR/nvm.sh" && \
@@ -243,6 +246,9 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.
     nvm alias default 'lts/*' && \
     npm install -g @google/gemini-cli && \
     npm install -g @anthropic-ai/claude-code
+
+# Switch back to zsh for the final shell
+SHELL ["/bin/zsh", "-c"]
 
 # ------------------------------------------------------------------
 # Ready for work!
