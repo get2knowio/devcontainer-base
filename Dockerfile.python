@@ -1,10 +1,11 @@
 ########################################################################
 #  Development Container - Python Base Image
 #  
-#  A comprehensive development environment built on Ubuntu 24.04 LTS
+#  A comprehensive development environment built on Microsoft's DevContainer
+#  base Ubuntu image with modern development tools and configurations.
 #  
 #  🐚 Shell & Prompt:
-#    • Zsh with Zinit plugin manager for fast loading
+#    • Zsh with Oh My Zsh (from base image)
 #    • Starship - minimal, blazing-fast, infinitely customizable prompt
 #    • Enhanced completions for all installed tools
 #  
@@ -32,7 +33,7 @@
 #  📁 Workspace: /workspace
 ########################################################################
 
-FROM ubuntu:24.04
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
 LABEL maintainer="you@example.com"
 
@@ -40,63 +41,37 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV NVM_VERSION=0.40.3
 ENV POETRY_HOME=/opt/poetry
 
-# Set up user environment variables
-ENV USERNAME=devuser
-ENV USER_UID=1001
-ENV USER_GID=1001
+# Set up user environment variables (using standard vscode user from base image)
+ENV USERNAME=vscode
 ENV USER_HOME=/home/$USERNAME
 ENV NVM_DIR=$USER_HOME/.nvm
-ENV PATH="$POETRY_HOME/bin:$NVM_DIR/versions/node/$(ls -1 $NVM_DIR/versions/node 2>/dev/null | tail -1)/bin:$PATH"
+ENV PATH="$POETRY_HOME/bin:$PATH"
 
 # ------------------------------------------------------------------
 # Essential system packages and modern CLI tools
 # ------------------------------------------------------------------
-# Core packages:
-#   • zsh - Z shell with better features than bash
-#   • git - distributed version control system
-#   • curl, wget - HTTP clients for downloading files
-#   • unzip - archive extraction utility
-#   • ca-certificates - certificate authority certificates
-#   • fonts-powerline - special fonts for enhanced terminal display
-# 
-# Python development:
-#   • python3.12 - latest stable Python version
-#   • python3.12-venv - virtual environment support
-#   • python3.12-dev - headers for compiling Python extensions
-#   • python3-pip - package installer for Python
-#
-# Modern CLI replacements and tools:
+# Modern CLI replacements and tools (base image already has git, curl, etc.):
 #   • eza - modern ls replacement with Git integration and colors
 #   • fzf - command-line fuzzy finder for interactive searching
 #   • bat - syntax-highlighted cat replacement
 #   • ripgrep - ultra-fast text search (grep replacement)
 #   • fd-find - intuitive find command replacement
 #   • jq - command-line JSON processor
+# 
+# Python development:
+#   • python3.12 - latest stable Python version
+#   • python3.12-venv - virtual environment support
+#   • python3.12-dev - headers for compiling Python extensions
+#   • python3-pip - package installer for Python
 RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
-        zsh fzf bat ripgrep fd-find jq \
-        eza \
+        eza bat ripgrep fd-find jq fzf \
         python3.12 python3.12-venv python3.12-dev python3-pip \
-        git curl wget unzip ca-certificates fonts-powerline \
-        sudo \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/batcat /usr/bin/bat \
     && ln -sf /usr/bin/fdfind /usr/bin/fd
 
 # ------------------------------------------------------------------
-# Create non-root user with sudo access
-# ------------------------------------------------------------------
-# Creates a non-root user for security and best practices:
-#   • devuser with UID/GID 1001 (avoids conflicts with existing users)
-#   • passwordless sudo access for development tasks
-#   • proper shell configuration (zsh)
-#   • group membership for common development tasks
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID --shell /bin/zsh --create-home $USERNAME \
-    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/99-$USERNAME \
-    && chmod 0440 /etc/sudoers.d/99-$USERNAME
-
-# ------------------------------------------------------------------
-# Starship - Cross-shell prompt
+# Starship - Cross-shell prompt (replacing Oh My Zsh theming)
 # ------------------------------------------------------------------
 # Starship is a minimal, blazing-fast, and infinitely customizable 
 # prompt for any shell. It shows information you need while staying 
@@ -119,42 +94,13 @@ RUN mkdir -p $USER_HOME/.config && \
     > $USER_HOME/.config/starship.toml
 
 # ------------------------------------------------------------------
-# Zinit - Fast Zsh plugin manager
+# Enhance Zsh configuration with modern tools
 # ------------------------------------------------------------------
-# Zinit is a flexible and fast Zsh plugin manager that can load plugins
-# asynchronously and in parallel. It provides:
-#   • Turbo mode for ultra-fast shell startup
-#   • Plugin loading optimization
-#   • Ice modifiers for fine-grained control
-#   • Extensive plugin ecosystem support
-RUN mkdir -p ~/.zinit && \
-    git clone https://github.com/zdharma-continuum/zinit.git ~/.zinit/bin
-
-# ------------------------------------------------------------------
-# Zsh configuration with plugins and completions
-# ------------------------------------------------------------------
-# Configures Zsh with productivity-enhancing plugins:
-#   • zsh-autosuggestions - fish-like autosuggestions based on history
-#   • zsh-completions - additional completion definitions
-#   • zsh-history-substring-search - fish-like history search
-# 
-# Includes modern aliases:
+# Add Starship prompt and modern aliases to the existing Oh My Zsh setup
+# Modern aliases:
 #   • ls/ll/la - eza with colors and icons
-#   • History navigation with up/down arrows
-# 
-# Tool completions for:
-#   • AWS CLI v2 - comprehensive command completion
-#   • Poetry - Python dependency management
-#   • npm - Node.js package management
-RUN echo 'export ZINIT_HOME="$HOME/.zinit"'                          >> $USER_HOME/.zshrc && \
-    echo 'source "$ZINIT_HOME/bin/zinit.zsh"'                        >> $USER_HOME/.zshrc && \
-    echo 'zinit light zsh-users/zsh-autosuggestions'                 >> $USER_HOME/.zshrc && \
-    echo 'zinit light zsh-users/zsh-completions'                     >> $USER_HOME/.zshrc && \
-    echo 'zinit light zsh-users/zsh-history-substring-search'        >> $USER_HOME/.zshrc && \
-    echo 'autoload -U compinit && compinit'                          >> $USER_HOME/.zshrc && \
-    echo 'bindkey "^[[A" history-substring-search-up'                >> $USER_HOME/.zshrc && \
-    echo 'bindkey "^[[B" history-substring-search-down'              >> $USER_HOME/.zshrc && \
-    echo 'eval "$(starship init zsh)"'                               >> $USER_HOME/.zshrc && \
+#   • Enhanced tool completions
+RUN echo 'eval "$(starship init zsh)"'                               >> $USER_HOME/.zshrc && \
     echo 'alias ls="eza --icons"'                                    >> $USER_HOME/.zshrc && \
     echo 'alias ll="eza -l --icons"'                                 >> $USER_HOME/.zshrc && \
     echo 'alias la="eza -la --icons"'                                >> $USER_HOME/.zshrc && \
@@ -163,11 +109,9 @@ RUN echo 'export ZINIT_HOME="$HOME/.zinit"'                          >> $USER_HO
     echo ''                                                           >> $USER_HOME/.zshrc && \
     echo '# Tool completions'                                        >> $USER_HOME/.zshrc && \
     echo 'complete -C "/usr/local/bin/aws_completer" aws'            >> $USER_HOME/.zshrc && \
-    echo 'fpath=(~/.zinit/completions $fpath)'                      >> $USER_HOME/.zshrc && \
     echo 'if command -v npm >/dev/null 2>&1; then'                  >> $USER_HOME/.zshrc && \
     echo '    eval "$(npm completion zsh)"'                          >> $USER_HOME/.zshrc && \
     echo 'fi'                                                        >> $USER_HOME/.zshrc
-CMD ["zsh"]
 
 # ------------------------------------------------------------------
 # AWS CLI v2 - Amazon Web Services Command Line Interface
@@ -211,14 +155,14 @@ RUN curl -sSL https://install.python-poetry.org | python3 && \
     ln -s $POETRY_HOME/bin/poetry /usr/local/bin/poetry
 
 # Generate Poetry completion during build for faster shell startup
-RUN mkdir -p $USER_HOME/.zinit/completions && \
-    poetry completions zsh > $USER_HOME/.zinit/completions/_poetry
+RUN mkdir -p $USER_HOME/.oh-my-zsh/completions && \
+    poetry completions zsh > $USER_HOME/.oh-my-zsh/completions/_poetry
 
-# Set ownership of all user files to devuser
+# Create python symlink while still root
+RUN ln -sf /usr/bin/python3 /usr/local/bin/python
+
+# Set ownership of all user files to vscode user
 RUN chown -R $USERNAME:$USERNAME $USER_HOME
-
-# Make Zsh the default shell for remaining operations
-SHELL ["/bin/zsh", "-c"]
 
 # Switch to non-root user for remaining operations
 USER $USERNAME
@@ -238,7 +182,6 @@ USER $USERNAME
 #     Advanced AI assistant for coding, debugging, and technical tasks
 #
 # Both tools enable AI-assisted development workflows directly from the terminal
-SHELL ["/bin/bash", "-c"]
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.sh | bash && \
     export NVM_DIR="$HOME/.nvm" && \
     . "$NVM_DIR/nvm.sh" && \
@@ -247,10 +190,18 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.
     npm install -g @google/gemini-cli && \
     npm install -g @anthropic-ai/claude-code
 
-# Switch back to zsh for the final shell
-SHELL ["/bin/zsh", "-c"]
+# ------------------------------------------------------------------
+# Configure shell environments for both bash and zsh
+# ------------------------------------------------------------------
+RUN echo 'alias python=python3' >> /home/vscode/.bashrc && \
+    echo 'alias python=python3' >> /home/vscode/.zshrc && \
+    echo 'export NVM_DIR="$HOME/.nvm"' >> /home/vscode/.bashrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"' >> /home/vscode/.bashrc && \
+    echo '[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"' >> /home/vscode/.bashrc
 
 # ------------------------------------------------------------------
 # Ready for work!
 # ------------------------------------------------------------------
 WORKDIR /workspace
+
+CMD ["zsh"]

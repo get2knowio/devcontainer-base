@@ -3,7 +3,9 @@
 This repository provides a base Docker image for use with Visual Studio Code's Dev Containers feature. The image is designed to simplify the setup of development environments by providing a pre-configured container with essential tools and dependencies.
 
 ## Features
+- Built on the official Microsoft Dev Containers base image for stability and compatibility.
 - Ready-to-use Python development environment.
+- Pre-configured non-root user (`vscode`) with sudo access.
 - Supports Visual Studio Code customizations (extensions, settings, etc.).
 - Multi-platform compatibility (linux/amd64, linux/arm64).
 - Simplifies dependency management with Poetry.
@@ -16,6 +18,7 @@ To leverage this base image in your own project, you can create a `.devcontainer
 {
   "name": "Python Dev Container",
   "image": "ghcr.io/get2knowio/devcontainer-python-base:latest",
+  "remoteUser": "vscode",
   "features": {},
   "postCreateCommand": "poetry install",
   "customizations": {
