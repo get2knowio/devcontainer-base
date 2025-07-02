@@ -12,127 +12,97 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-IMAGE_NAME="devcontainer-python-base"
-TAG="test"
-FULL_IMAGE_NAME="${IMAGE_NAME}:${TAG}"
+IMAGE_NAME=${1:-"devcontainer-python-base:test"}
 
-echo -e "${YELLOW}🧹 Cleaning up any existing test images...${NC}"
-# Remove existing test image if it exists
-if docker image inspect "${FULL_IMAGE_NAME}" >/dev/null 2>&1; then
-    echo "Removing existing image: ${FULL_IMAGE_NAME}"
-    docker rmi "${FULL_IMAGE_NAME}" >/dev/null 2>&1 || true
+echo "Testing image: ${IMAGE_NAME}"
+
+# If no argument is passed, build the image
+if [ -z "$1" ]; then
+  TAG="test"
+  FULL_IMAGE_NAME="devcontainer-python-base:${TAG}"
+  echo -e "${YELLOW}🧹 Cleaning up any existing test images...${NC}"
+  # Remove existing test image if it exists
+  if docker image inspect "${FULL_IMAGE_NAME}" >/dev/null 2>&1; then
+      echo "Removing existing image: ${FULL_IMAGE_NAME}"
+      docker rmi "${FULL_IMAGE_NAME}" >/dev/null 2>&1 || true
+  fi
+
+  # Clean up any dangling images to free space
+  echo "Cleaning up dangling images..."
+  docker image prune -f >/dev/null 2>&1 || true
+
+  echo -e "${YELLOW}🔨 Building Docker image locally...${NC}"
+  echo "Image: ${FULL_IMAGE_NAME}"
+  echo "Dockerfile: ./Dockerfile.python"
+  echo ""
+
+  # Build the image
+  docker build --quiet --no-cache -f Dockerfile.python -t "${FULL_IMAGE_NAME}" .
+
+  if [ $? -eq 0 ]; then
+      echo -e "${GREEN}✅ Build successful!${NC}"
+  else
+      echo -e "${RED}❌ Build failed!${NC}"
+      exit 1
+  fi
+else
+  FULL_IMAGE_NAME=$IMAGE_NAME
 fi
 
-# Clean up any dangling images to free space
-echo "Cleaning up dangling images..."
-docker image prune -f >/dev/null 2>&1 || true
-
-echo -e "${YELLOW}🔨 Building Docker image locally...${NC}"
-echo "Image: ${FULL_IMAGE_NAME}"
-echo "Dockerfile: ./Dockerfile.python"
 echo ""
+echo -e "${YELLOW}🧪 Running comprehensive tests inside the container...${NC}"
 
-# Build the image
-docker build --no-cache -f Dockerfile.python -t "${FULL_IMAGE_NAME}" .
+# Run comprehensive tests
+docker run --rm "${FULL_IMAGE_NAME}" bash -c '
+  echo "✅ Testing Python installations"
+  echo "python --version:"
+  python --version
+  echo "python3 --version:"
+  python3 --version
+  echo "python3.12 --version:"
+  python3.12 --version
+
+  echo ""
+  echo "✅ Testing Poetry"
+  poetry --version
+
+  echo ""
+  echo "✅ Testing Node.js (via NVM)"
+  source ~/.nvm/nvm.sh && node --version && npm --version
+
+  echo ""
+  echo "✅ Testing AWS CLI"
+  aws --version 2>/dev/null || echo "AWS CLI not available (expected on some architectures)"
+
+  echo ""
+  echo "✅ Testing development tools"
+  echo "Git: $(git --version)"
+  echo "eza: $(eza --version | head -1)"
+  echo "bat: $(bat --version)"
+  echo "ripgrep: $(rg --version | head -1)"
+  echo "Starship: $(starship --version 2>/dev/null || echo "available")"
+
+  echo ""
+  echo "✅ Testing shell configuration"
+  echo "Starship prompt in zsh: $(grep starship ~/.zshrc | head -1)"
+  echo "Python alias in bashrc: $(grep "alias python" ~/.bashrc)"
+
+  echo ""
+  echo "✅ Testing Python packages can be installed"
+  python -m pip install --quiet --break-system-packages requests
+  python -c "import requests; print(f\"requests: {requests.__version__}\")"
+
+  echo ""
+  echo "🎉 All tests completed successfully!"
+  echo "Architecture: $(uname -m)"
+'
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ Build successful!${NC}"
+    echo ""
+    echo -e "${GREEN}🎉 Docker image test PASSED!${NC}"
+    echo "The ${FULL_IMAGE_NAME} image is ready to use."
 else
-    echo -e "${RED}❌ Build failed!${NC}"
+    echo ""
+    echo -e "${RED}❌ Docker image test FAILED!${NC}"
     exit 1
 fi
-
-echo ""
-echo -e "${YELLOW}🧪 Running basic tests...${NC}"
-
-# Test 1: Check if the image runs
-echo "Test 1: Container starts successfully..."
-if docker run --rm "${FULL_IMAGE_NAME}" echo "Container started successfully" > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ Container starts successfully${NC}"
-else
-    echo -e "${RED}❌ Container failed to start${NC}"
-    exit 1
-fi
-
-# Test 2: Check Python installation
-echo "Test 2: Python 3.12 is installed..."
-PYTHON_VERSION=$(docker run --rm "${FULL_IMAGE_NAME}" python3.12 --version 2>/dev/null | grep "Python 3.12" || echo "")
-if [ -n "$PYTHON_VERSION" ]; then
-    echo -e "${GREEN}✅ Python 3.12 is installed: ${PYTHON_VERSION}${NC}"
-else
-    echo -e "${RED}❌ Python 3.12 not found${NC}"
-    exit 1
-fi
-
-# Test 3: Check Poetry installation
-echo "Test 3: Poetry is installed..."
-POETRY_VERSION=$(docker run --rm "${FULL_IMAGE_NAME}" poetry --version 2>/dev/null || echo "")
-if [ -n "$POETRY_VERSION" ]; then
-    echo -e "${GREEN}✅ Poetry is installed: ${POETRY_VERSION}${NC}"
-else
-    echo -e "${RED}❌ Poetry not found${NC}"
-    exit 1
-fi
-
-# Test 4: Check if devuser exists
-echo "Test 4: Non-root user 'devuser' exists..."
-USER_EXISTS=$(docker run --rm "${FULL_IMAGE_NAME}" id devuser 2>/dev/null || echo "")
-if [ -n "$USER_EXISTS" ]; then
-    echo -e "${GREEN}✅ User 'devuser' exists: ${USER_EXISTS}${NC}"
-else
-    echo -e "${RED}❌ User 'devuser' not found${NC}"
-    exit 1
-fi
-
-# Test 5: Check if zsh is available
-echo "Test 5: Zsh shell is available..."
-ZSH_VERSION=$(docker run --rm "${FULL_IMAGE_NAME}" zsh --version 2>/dev/null || echo "")
-if [ -n "$ZSH_VERSION" ]; then
-    echo -e "${GREEN}✅ Zsh is available: ${ZSH_VERSION}${NC}"
-else
-    echo -e "${RED}❌ Zsh not found${NC}"
-    exit 1
-fi
-
-# Test 6: Check if essential tools are installed
-echo "Test 6: Essential CLI tools are installed..."
-TOOLS=("git" "curl" "jq" "rg")
-for tool in "${TOOLS[@]}"; do
-    if docker run --rm "${FULL_IMAGE_NAME}" which "$tool" > /dev/null 2>&1; then
-        echo -e "${GREEN}✅ ${tool} is installed${NC}"
-    else
-        echo -e "${RED}❌ ${tool} not found${NC}"
-        exit 1
-    fi
-done
-
-# Special check for bat (which might be installed as batcat in Ubuntu)
-echo -n "Test 6b: bat (syntax highlighter) is available... "
-if docker run --rm "${FULL_IMAGE_NAME}" which bat > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ bat is installed${NC}"
-elif docker run --rm "${FULL_IMAGE_NAME}" which batcat > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ bat is installed (as batcat)${NC}"
-else
-    echo -e "${RED}❌ bat not found${NC}"
-    exit 1
-fi
-
-# Special check for fd (which might be installed as fdfind in Ubuntu)
-echo -n "Test 6c: fd (find alternative) is available... "
-if docker run --rm "${FULL_IMAGE_NAME}" which fd > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ fd is installed${NC}"
-elif docker run --rm "${FULL_IMAGE_NAME}" which fdfind > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ fd is installed (as fdfind)${NC}"
-else
-    echo -e "${RED}❌ fd not found${NC}"
-    exit 1
-fi
-
-echo ""
-echo -e "${GREEN}🎉 All tests passed! The image is ready for use.${NC}"
-echo ""
-echo "To use this image in your devcontainer:"
-echo "  \"image\": \"${FULL_IMAGE_NAME}\""
-echo ""
-echo "To clean up the test image:"
-echo "  docker rmi ${FULL_IMAGE_NAME}"

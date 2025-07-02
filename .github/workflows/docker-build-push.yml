@@ -22,6 +22,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
+      attestations: write
 
     steps:
       - name: Checkout repository
@@ -57,8 +58,27 @@ jobs:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache
           pull-request-cache: true
 
-      - name: Build and push Docker image
+      - name: Build and load Docker image
         id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.python
+          platforms: linux/amd64,linux/arm64
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: ${{ steps.cache.outputs.cache-from }}
+          cache-to: ${{ steps.cache.outputs.cache-to }}
+
+      - name: Run tests
+        run: |
+          chmod +x ./test.sh
+          ./test.sh $(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
+
+      - name: Push Docker image
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -71,6 +91,7 @@ jobs:
           cache-to: ${{ steps.cache.outputs.cache-to }}
 
       - name: Generate artifact attestation
+        if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@v1
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
