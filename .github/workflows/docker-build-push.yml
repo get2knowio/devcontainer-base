@@ -84,6 +84,8 @@ jobs:
 
       - name: Tag and push final image
         if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Get all the final tags we want
           TAGS="${{ steps.meta.outputs.tags }}"
