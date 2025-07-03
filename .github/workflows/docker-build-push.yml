@@ -58,25 +58,7 @@ jobs:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache
           pull-request-cache: true
 
-      - name: Build and test image
-        id: build-and-test
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.python
-          platforms: linux/amd64
-          load: true
-          push: false
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
-          cache-from: ${{ steps.cache.outputs.cache-from }}
-          cache-to: ${{ steps.cache.outputs.cache-to }}
-
-      - name: Run tests
-        run: |
-          chmod +x ./test.sh
-          ./test.sh ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
-
-      - name: Build and push multi-platform image
+      - name: Build and push multi-platform image (temp tag)
         if: github.event_name != 'pull_request'
         id: build-and-push
         uses: docker/build-push-action@v5
@@ -85,10 +67,56 @@ jobs:
           file: ./Dockerfile.python
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
+
+      - name: Pull and test amd64 image
+        if: github.event_name != 'pull_request'
+        run: |
+          # Pull the amd64 version of the image we just pushed
+          docker pull --platform linux/amd64 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+          
+          # Run tests
+          chmod +x ./test.sh
+          ./test.sh ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+
+      - name: Tag and push final image
+        if: github.event_name != 'pull_request'
+        run: |
+          # Get all the final tags we want
+          TAGS="${{ steps.meta.outputs.tags }}"
+          
+          # Tag the tested image with all final tags
+          for tag in $TAGS; do
+            docker buildx imagetools create \
+              --tag $tag \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+          done
+          
+          # Clean up the temporary tag
+          echo "Cleaning up temporary test tag..."
+          docker run --rm quay.io/skopeo/stable:latest delete docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} || echo "Failed to delete temporary tag (non-critical)"
+
+      - name: Build for pull request (test only)
+        if: github.event_name == 'pull_request'
+        id: build-pr
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.python
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-test
+          cache-from: ${{ steps.cache.outputs.cache-from }}
+
+      - name: Test pull request image
+        if: github.event_name == 'pull_request'
+        run: |
+          chmod +x ./test.sh
+          ./test.sh ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-test
 
       - name: Generate artifact attestation
         if: github.event_name != 'pull_request'
