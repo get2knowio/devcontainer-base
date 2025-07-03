@@ -95,9 +95,10 @@ jobs:
               ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
           done
           
-          # Clean up the temporary tag
+          # Clean up the temporary tag using GitHub CLI
           echo "Cleaning up temporary test tag..."
-          docker run --rm quay.io/skopeo/stable:latest delete docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }} || echo "Failed to delete temporary tag (non-critical)"
+          gh api --method DELETE "/user/packages/container/${{ env.IMAGE_NAME }}/versions" \
+            --field "names[]=test-${{ github.sha }}" || echo "Failed to delete temporary tag (non-critical)"
 
       - name: Build for pull request (test only)
         if: github.event_name == 'pull_request'
