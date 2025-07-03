@@ -97,22 +97,7 @@ jobs:
               ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
           done
           
-          # Clean up the temporary tag using GitHub CLI
-          echo "Cleaning up temporary test tag..."
-          # First, get the version ID for our temporary tag
-          TEMP_TAG="test-${{ github.sha }}"
-          PACKAGE_NAME=$(echo "${{ env.IMAGE_NAME }}" | cut -d'/' -f2)
-          
-          # Get the version ID for the temporary tag
-          VERSION_ID=$(gh api "/user/packages/container/${PACKAGE_NAME}/versions" \
-            --jq ".[] | select(.metadata.container.tags[]? == \"${TEMP_TAG}\") | .id" 2>/dev/null || echo "")
-          
-          if [ -n "$VERSION_ID" ]; then
-            echo "Found version ID: $VERSION_ID for tag: $TEMP_TAG"
-            gh api --method DELETE "/user/packages/container/${PACKAGE_NAME}/versions/${VERSION_ID}" || echo "Failed to delete temporary tag (non-critical)"
-          else
-            echo "Could not find version ID for temporary tag: $TEMP_TAG (non-critical)"
-          fi
+          echo "✅ Successfully tagged and pushed final image with all tags"
 
       - name: Build for pull request (test only)
         if: github.event_name == 'pull_request'
