@@ -1,0 +1,276 @@
+########################################################################
+#  Development Container - TypeScript Base Image
+#  
+#  A comprehensive development environment built on Microsoft's DevContainer
+#  base Ubuntu image with modern TypeScript and JavaScript development tools.
+#  
+#  🐚 Shell & Prompt:
+#    • Zsh with Oh My Zsh (from base image)
+#    • Starship - minimal, blazing-fast, infinitely customizable prompt
+#    • Enhanced completions for all installed tools
+#  
+#  🚀 JavaScript/TypeScript Ecosystem:
+#    • Node.js LTS via nvm (Node Version Manager)
+#    • Bun - fast all-in-one JavaScript runtime
+#    • TypeScript - typed superset of JavaScript
+#    • pnpm - fast, disk space efficient package manager
+#    • Yarn - alternative package manager
+#  
+#  ☁️ Cloud & Infrastructure:
+#    • AWS CLI v2 - unified command line interface for AWS services
+#  
+#  🐍 Python Support:
+#    • Python 3.12 - for polyglot development and tooling
+#    • pip support for Python-based tools
+#  
+#  🌐 AI Development Tools:
+#    • Gemini CLI - Google's generative AI command line tool
+#    • Claude Code - Anthropic's AI assistant for developers
+#  
+#  🛠️ Modern CLI Tools:
+#    • eza - modern replacement for ls with colors and Git integration
+#    • fzf - command-line fuzzy finder
+#    • bat - syntax-highlighted file viewer (cat clone)
+#    • ripgrep - ultra-fast text search tool
+#    • fd-find - simple, fast alternative to find
+#    • jq - lightweight command-line JSON processor
+#  
+#  📁 Workspace: /workspace
+########################################################################
+
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+
+LABEL maintainer="you@example.com"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NVM_VERSION=0.40.3
+ENV BUN_INSTALL=/opt/bun
+
+# Set up user environment variables (using standard vscode user from base image)
+ENV USERNAME=vscode
+ENV USER_HOME=/home/$USERNAME
+ENV NVM_DIR=$USER_HOME/.nvm
+ENV PATH="$BUN_INSTALL/bin:$PATH"
+
+# ------------------------------------------------------------------
+# Essential system packages and modern CLI tools
+# ------------------------------------------------------------------
+# Modern CLI replacements and tools (base image already has git, curl, etc.):
+#   • eza - modern ls replacement with Git integration and colors
+#   • fzf - command-line fuzzy finder for interactive searching
+#   • bat - syntax-highlighted cat replacement
+#   • ripgrep - ultra-fast text search (grep replacement)
+#   • fd-find - intuitive find command replacement
+#   • jq - command-line JSON processor
+# 
+# Python support (for tooling and polyglot development):
+#   • python3.12 - latest stable Python version
+#   • python3-pip - package installer for Python tools
+RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
+        eza bat ripgrep fd-find jq fzf \
+        python3.12 python3-pip \
+        build-essential \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/batcat /usr/bin/bat \
+    && ln -sf /usr/bin/fdfind /usr/bin/fd \
+    && ln -sf /usr/bin/python3 /usr/local/bin/python
+
+# ------------------------------------------------------------------
+# Starship - Cross-shell prompt (replacing Oh My Zsh theming)
+# ------------------------------------------------------------------
+# Starship is a minimal, blazing-fast, and infinitely customizable 
+# prompt for any shell. It shows information you need while staying 
+# sleek and minimal. Features include:
+#   • Git status integration
+#   • Package version detection
+#   • Runtime environment indicators
+#   • Custom theming support
+#   • Language/framework detection
+# 
+# Configuration includes:
+#   • 2000ms command timeout for better performance
+#   • Disabled container and docker_context modules (redundant in containers)
+RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
+
+RUN mkdir -p $USER_HOME/.config && \
+    echo 'command_timeout = 2000\n' \
+         '[container]\ndisabled = true\n' \
+         '[docker_context]\ndisabled = true' \
+    > $USER_HOME/.config/starship.toml
+
+# ------------------------------------------------------------------
+# Enhance Zsh configuration with modern tools
+# ------------------------------------------------------------------
+# Add Starship prompt and modern aliases to the existing Oh My Zsh setup
+# Modern aliases:
+#   • ls/ll/la - eza with colors and icons
+#   • Enhanced tool completions
+RUN echo 'eval "$(starship init zsh)"'                               >> $USER_HOME/.zshrc && \
+    echo 'alias ls="eza --icons"'                                    >> $USER_HOME/.zshrc && \
+    echo 'alias ll="eza -l --icons"'                                 >> $USER_HOME/.zshrc && \
+    echo 'alias la="eza -la --icons"'                                >> $USER_HOME/.zshrc && \
+    echo 'export NVM_DIR="$HOME/.nvm"'                               >> $USER_HOME/.zshrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'           >> $USER_HOME/.zshrc && \
+    echo 'export BUN_INSTALL="/opt/bun"'                             >> $USER_HOME/.zshrc && \
+    echo 'export PATH="$BUN_INSTALL/bin:$PATH"'                      >> $USER_HOME/.zshrc && \
+    echo ''                                                           >> $USER_HOME/.zshrc && \
+    echo '# Tool completions'                                        >> $USER_HOME/.zshrc && \
+    echo 'complete -C "/usr/local/bin/aws_completer" aws'            >> $USER_HOME/.zshrc && \
+    echo 'if command -v npm >/dev/null 2>&1; then'                  >> $USER_HOME/.zshrc && \
+    echo '    eval "$(npm completion zsh)"'                          >> $USER_HOME/.zshrc && \
+    echo 'fi'                                                        >> $USER_HOME/.zshrc && \
+    echo 'if command -v bun >/dev/null 2>&1; then'                  >> $USER_HOME/.zshrc && \
+    echo '    eval "$(bun completions zsh)"'                         >> $USER_HOME/.zshrc && \
+    echo 'fi'                                                        >> $USER_HOME/.zshrc
+
+# ------------------------------------------------------------------
+# AWS CLI v2 - Amazon Web Services Command Line Interface
+# ------------------------------------------------------------------
+# AWS CLI v2 is the official command line interface for AWS services.
+# It provides:
+#   • Unified interface to all AWS services
+#   • Enhanced performance and stability over v1
+#   • Auto-completion support
+#   • Built-in pagination and output formatting
+#   • Session management and credential handling
+#   • Support for AWS SSO and modern authentication methods
+# 
+# Installation detects the target architecture and downloads the appropriate 
+# AWS CLI package for multi-architecture builds (amd64/arm64).
+ARG TARGETARCH
+RUN if [ "$TARGETARCH" = "amd64" ] || [ "$TARGETARCH" = "x86_64" ]; then \
+      curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"; \
+    elif [ "$TARGETARCH" = "arm64" ] || [ "$TARGETARCH" = "aarch64" ]; then \
+      curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"; \
+    else \
+      echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+    fi && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf awscliv2.zip aws/
+
+# ------------------------------------------------------------------
+# Bun - Fast all-in-one JavaScript runtime & toolkit
+# ------------------------------------------------------------------
+# Bun is a fast JavaScript runtime, package manager, test runner and bundler.
+# It provides:
+#   • Ultra-fast JavaScript/TypeScript execution
+#   • Built-in package manager (faster than npm/yarn)
+#   • Native TypeScript support (no compilation needed)
+#   • Built-in test runner and bundler
+#   • Hot reloading and watch mode
+#   • Web APIs and Node.js compatibility
+#
+# Installed to /opt/bun for system-wide access with proper permissions
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.29" && \
+    mv $USER_HOME/.bun $BUN_INSTALL && \
+    chmod +x $BUN_INSTALL/bin/bun
+
+# Set ownership of bun installation
+RUN chown -R $USERNAME:$USERNAME $BUN_INSTALL
+
+# Switch to non-root user for remaining operations
+USER $USERNAME
+
+# ------------------------------------------------------------------------------
+# Node.js LTS with comprehensive TypeScript tooling
+# ------------------------------------------------------------------------------
+# Node Version Manager (nvm) for flexible Node.js management:
+#   • Installs and manages multiple Node.js versions
+#   • Automatically switches versions per project
+#   • Provides the latest LTS (Long Term Support) version
+#
+# TypeScript ecosystem:
+#   • typescript - TypeScript compiler and language server
+#   • ts-node - TypeScript execution environment for Node.js
+#   • tsx - enhanced TypeScript execution with ESM support
+#   • @types/node - TypeScript definitions for Node.js APIs
+#   • nodemon - development server with auto-restart
+#   • concurrently - run multiple commands concurrently
+#
+# Package managers:
+#   • pnpm - fast, disk space efficient package manager
+#   • yarn - popular alternative package manager
+#
+# Build and development tools:
+#   • vite - next generation frontend build tool
+#   • esbuild - extremely fast JavaScript bundler
+#   • prettier - opinionated code formatter
+#   • eslint - pluggable JavaScript/TypeScript linter
+#
+# AI-powered development tools:
+#   • @google/gemini-cli - Google's Gemini AI assistant for development
+#   • @anthropic-ai/claude-code - Anthropic's Claude AI for development
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.sh | bash && \
+    export NVM_DIR="$HOME/.nvm" && \
+    . "$NVM_DIR/nvm.sh" && \
+    nvm install --lts && \
+    nvm alias default 'lts/*' && \
+    npm install -g pnpm yarn && \
+    npm install -g typescript ts-node tsx @types/node && \
+    npm install -g nodemon concurrently && \
+    npm install -g vite esbuild && \
+    npm install -g prettier eslint && \
+    npm install -g @google/gemini-cli && \
+    npm install -g @anthropic-ai/claude-code
+
+# ------------------------------------------------------------------
+# Install global TypeScript tooling with Bun
+# ------------------------------------------------------------------
+# Use Bun to install additional TypeScript development tools for faster execution:
+#   • @biomejs/biome - fast formatter and linter (Rust-based)
+#   • tsc-watch - TypeScript compiler with watch mode
+#   • type-fest - collection of essential TypeScript types
+RUN /opt/bun/bin/bun install -g @biomejs/biome tsc-watch
+
+# ------------------------------------------------------------------
+# Configure shell environments for both bash and zsh
+# ------------------------------------------------------------------
+RUN echo 'alias python=python3' >> /home/vscode/.bashrc && \
+    echo 'alias python=python3' >> /home/vscode/.zshrc && \
+    echo 'export NVM_DIR="$HOME/.nvm"' >> /home/vscode/.bashrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"' >> /home/vscode/.bashrc && \
+    echo '[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"' >> /home/vscode/.bashrc && \
+    echo 'export BUN_INSTALL="/opt/bun"' >> /home/vscode/.bashrc && \
+    echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> /home/vscode/.bashrc
+
+# ------------------------------------------------------------------
+# Create useful TypeScript aliases and shortcuts
+# ------------------------------------------------------------------
+RUN echo '# TypeScript development aliases' >> /home/vscode/.zshrc && \
+    echo 'alias tsc="npx tsc"' >> /home/vscode/.zshrc && \
+    echo 'alias tsx="npx tsx"' >> /home/vscode/.zshrc && \
+    echo 'alias tsw="npx tsc-watch"' >> /home/vscode/.zshrc && \
+    echo 'alias dev="npm run dev"' >> /home/vscode/.zshrc && \
+    echo 'alias build="npm run build"' >> /home/vscode/.zshrc && \
+    echo 'alias test="npm test"' >> /home/vscode/.zshrc && \
+    echo 'alias lint="npm run lint"' >> /home/vscode/.zshrc && \
+    echo 'alias format="npm run format"' >> /home/vscode/.zshrc && \
+    echo '' >> /home/vscode/.zshrc && \
+    echo '# Bun aliases' >> /home/vscode/.zshrc && \
+    echo 'alias bi="bun install"' >> /home/vscode/.zshrc && \
+    echo 'alias br="bun run"' >> /home/vscode/.zshrc && \
+    echo 'alias bt="bun test"' >> /home/vscode/.zshrc && \
+    echo 'alias bd="bun run dev"' >> /home/vscode/.zshrc
+
+# Add same aliases to bash
+RUN echo '# TypeScript development aliases' >> /home/vscode/.bashrc && \
+    echo 'alias tsc="npx tsc"' >> /home/vscode/.bashrc && \
+    echo 'alias tsx="npx tsx"' >> /home/vscode/.bashrc && \
+    echo 'alias tsw="npx tsc-watch"' >> /home/vscode/.bashrc && \
+    echo 'alias dev="npm run dev"' >> /home/vscode/.bashrc && \
+    echo 'alias build="npm run build"' >> /home/vscode/.bashrc && \
+    echo 'alias test="npm test"' >> /home/vscode/.bashrc && \
+    echo 'alias lint="npm run lint"' >> /home/vscode/.bashrc && \
+    echo 'alias format="npm run format"' >> /home/vscode/.bashrc && \
+    echo 'alias bi="bun install"' >> /home/vscode/.bashrc && \
+    echo 'alias br="bun run"' >> /home/vscode/.bashrc && \
+    echo 'alias bt="bun test"' >> /home/vscode/.bashrc && \
+    echo 'alias bd="bun run dev"' >> /home/vscode/.bashrc
+
+# ------------------------------------------------------------------
+# Ready for TypeScript development!
+# ------------------------------------------------------------------
+WORKDIR /workspace
+
+CMD ["zsh"]

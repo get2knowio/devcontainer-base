@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push DevContainer Images
 
 on:
   push:
@@ -14,11 +14,19 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: get2knowio/devcontainer-python-base
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant:
+          - name: python
+            dockerfile: Dockerfile.python
+            image_name: get2knowio/devcontainer-python-base
+          - name: typescript
+            dockerfile: Dockerfile.typescript
+            image_name: get2knowio/devcontainer-typescript-base
     permissions:
       contents: read
       packages: write
@@ -43,7 +51,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -56,7 +64,7 @@ jobs:
         id: cache
         uses: int128/docker-build-cache-config-action@v1
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/cache
+          image: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}/cache
           pull-request-cache: true
 
       - name: Build and push multi-platform image (temp tag)
@@ -65,10 +73,10 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.python
+          file: ./${{ matrix.variant.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+          tags: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
@@ -77,11 +85,11 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           # Pull the amd64 version of the image we just pushed
-          docker pull --platform linux/amd64 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+          docker pull --platform linux/amd64 ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
           
           # Run tests
           chmod +x ./test.sh
-          ./test.sh ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+          ./test.sh ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
 
       - name: Tag and push final image
         if: github.event_name != 'pull_request'
@@ -95,7 +103,7 @@ jobs:
           for tag in $TAGS; do
             docker buildx imagetools create \
               --tag $tag \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
+              ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
           done
           
           echo "✅ Successfully tagged and pushed final image with all tags"
@@ -106,23 +114,23 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.python
+          file: ./${{ matrix.variant.dockerfile }}
           platforms: linux/amd64
           load: true
           push: false
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-test
+          tags: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:pr-test
           cache-from: ${{ steps.cache.outputs.cache-from }}
 
       - name: Test pull request image
         if: github.event_name == 'pull_request'
         run: |
           chmod +x ./test.sh
-          ./test.sh ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-test
+          ./test.sh ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:pr-test
 
       - name: Generate artifact attestation
         if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-name: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
           push-to-registry: true
