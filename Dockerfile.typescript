@@ -162,8 +162,8 @@ RUN if [ "$TARGETARCH" = "amd64" ] || [ "$TARGETARCH" = "x86_64" ]; then \
 #   • Web APIs and Node.js compatibility
 #
 # Installed to /opt/bun for system-wide access with proper permissions
-RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.29" && \
-    mv $USER_HOME/.bun $BUN_INSTALL && \
+RUN export BUN_INSTALL=/opt/bun && \
+    curl -fsSL https://bun.sh/install | bash -s "bun-v1.2.19" && \
     chmod +x $BUN_INSTALL/bin/bun
 
 # Set ownership of bun installation
