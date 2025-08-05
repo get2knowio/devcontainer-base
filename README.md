@@ -80,17 +80,25 @@ To leverage these base images in your own project, you can create a `.devcontain
 To test the images locally before pushing changes, you can use the provided test script:
 
 ```bash
-# Test the Python image
-./test.sh ghcr.io/get2knowio/devcontainer-python-base:latest
+# Test both images (build and test)
+./test.sh
 
-# Test the TypeScript image  
+# Test only the Python image
+./test.sh python
+
+# Test only the TypeScript image  
+./test.sh typescript
+
+# Test a specific pre-built image
+./test.sh ghcr.io/get2knowio/devcontainer-python-base:latest
 ./test.sh ghcr.io/get2knowio/devcontainer-typescript-base:latest
 ```
 
 This script will:
-- Build the Docker image locally (if needed)
-- Run a series of tests to verify the image works correctly
+- Build the Docker images locally (when no specific image is provided)
+- Run comprehensive tests to verify each image works correctly
 - Check that all essential tools and dependencies are properly installed
+- Provide detailed output for debugging any issues
 
 ## Build and Push Workflow
 This repository includes a GitHub Actions workflow (`.github/workflows/docker-build-push.yml`) to automatically build and push both Docker images to GHCR on changes to the `main` or `develop` branches, or when a new tag is created. The workflow uses a matrix strategy to build both Python and TypeScript variants in parallel.
