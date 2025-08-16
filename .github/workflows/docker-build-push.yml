@@ -101,14 +101,14 @@ jobs:
           echo "image_repo=$image_repo" >> $GITHUB_OUTPUT
           echo "tag_only=$tag_only" >> $GITHUB_OUTPUT
 
-    - name: Build and push multi-arch image (via DevContainer CLI)
-          uses: devcontainers/ci@v0.3
-          with:
-            configFile: containers/common/devcontainer.json
-            imageName: ${{ steps.canonical.outputs.image_repo }}
-            imageTag: ${{ steps.canonical.outputs.tag_only }}
-            platform: linux/amd64,linux/arm64
-            push: always
+      - name: Build and push multi-arch image (via DevContainer CLI)
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: containers/common/devcontainer.json
+          imageName: ${{ steps.canonical.outputs.image_repo }}
+          imageTag: ${{ steps.canonical.outputs.tag_only }}
+          platform: linux/amd64,linux/arm64
+          push: always
 
       - name: Retag and publish additional tags as manifest list
         if: ${{ steps.meta.outputs.tags != '' }}
@@ -191,14 +191,14 @@ jobs:
           echo "image_repo=$image_repo" >> $GITHUB_OUTPUT
           echo "tag_only=$tag_only" >> $GITHUB_OUTPUT
 
-    - name: Build and push multi-arch image (via DevContainer CLI)
-          uses: devcontainers/ci@v0.3
-          with:
-            configFile: containers/${{ matrix.container }}/devcontainer.json
-            imageName: ${{ steps.canonical.outputs.image_repo }}
-            imageTag: ${{ steps.canonical.outputs.tag_only }}
-            platform: linux/amd64,linux/arm64
-            push: always
+      - name: Build and push multi-arch image (via DevContainer CLI)
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: containers/${{ matrix.container }}/devcontainer.json
+          imageName: ${{ steps.canonical.outputs.image_repo }}
+          imageTag: ${{ steps.canonical.outputs.tag_only }}
+          platform: linux/amd64,linux/arm64
+          push: always
 
       - name: Retag and publish additional tags as manifest list
         if: ${{ steps.meta.outputs.tags != '' }}
