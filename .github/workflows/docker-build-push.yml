@@ -1,4 +1,4 @@
-name: Build and Push DevContainer Images
+name: Test and Push DevContainer Images
 
 on:
   push:
@@ -16,29 +16,21 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  build-and-push:
+  test-and-push:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        variant:
-          - name: python
-            dockerfile: containers/python/Dockerfile
-            image_name: get2knowio/devcontainer-python-base
-          - name: typescript
-            dockerfile: containers/typescript/Dockerfile
-            image_name: get2knowio/devcontainer-typescript-base
     permissions:
       contents: read
       packages: write
       id-token: write
-      attestations: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Set up Node.js (for DevContainer CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -47,90 +39,68 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
+      - name: Install DevContainer CLI
+        run: |
+          npm install -g @devcontainers/cli
+
+      - name: Run tests (build + validate both images)
+        run: |
+          chmod +x ./scripts/*.sh || true
+          chmod +x ./build ./build.sh ./test || true
+          chmod +x ./scripts/test.sh
+          ./scripts/test.sh --build
+
+      # Only tag and push if tests passed and this is not a PR
+      - name: Extract metadata (python)
+        if: github.event_name != 'pull_request'
+        id: meta_python
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}
+          images: ${{ env.REGISTRY }}/get2knowio/devcontainer-python-base
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Configure build cache
-        id: cache
-        uses: int128/docker-build-cache-config-action@v1
-        with:
-          image: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}/cache
-          pull-request-cache: true
-
-      - name: Build and push multi-platform image (temp tag)
+      - name: Extract metadata (typescript)
         if: github.event_name != 'pull_request'
-        id: build-and-push
-        uses: docker/build-push-action@v5
+        id: meta_typescript
+        uses: docker/metadata-action@v5
         with:
-          context: .
-          file: ./${{ matrix.variant.dockerfile }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: ${{ steps.cache.outputs.cache-from }}
-          cache-to: ${{ steps.cache.outputs.cache-to }}
+          images: ${{ env.REGISTRY }}/get2knowio/devcontainer-typescript-base
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Pull and test amd64 image
+      - name: Tag and push images (python)
         if: github.event_name != 'pull_request'
         run: |
-          # Pull the amd64 version of the image we just pushed
-          docker pull --platform linux/amd64 ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
-          
-          # Run tests
-          chmod +x ./scripts/test.sh
-          ./scripts/test.sh ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
-
-      - name: Tag and push final image
-        if: github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Get all the final tags we want
-          TAGS="${{ steps.meta.outputs.tags }}"
-          
-          # Tag the tested image with all final tags
+          SRC=devcontainer-python-base:latest
+          TAGS="${{ steps.meta_python.outputs.tags }}"
+          echo "Pushing Python image tags:" 
+          echo "$TAGS"
           for tag in $TAGS; do
-            docker buildx imagetools create \
-              --tag $tag \
-              ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
+            echo "Tagging $SRC -> $tag"
+            docker tag "$SRC" "$tag"
+            docker push "$tag"
           done
-          
-          echo "✅ Successfully tagged and pushed final image with all tags"
 
-      - name: Build for pull request (test only)
-        if: github.event_name == 'pull_request'
-        id: build-pr
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./${{ matrix.variant.dockerfile }}
-          platforms: linux/amd64
-          load: true
-          push: false
-          tags: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:pr-test
-          cache-from: ${{ steps.cache.outputs.cache-from }}
-
-      - name: Test pull request image
-        if: github.event_name == 'pull_request'
-        run: |
-          chmod +x ./scripts/test.sh
-          ./scripts/test.sh ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:pr-test
-
-      - name: Generate artifact attestation
+      - name: Tag and push images (typescript)
         if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}
-          subject-digest: ${{ steps.build-and-push.outputs.digest }}
-          push-to-registry: true
+        run: |
+          SRC=devcontainer-typescript-base:latest
+          TAGS="${{ steps.meta_typescript.outputs.tags }}"
+          echo "Pushing TypeScript image tags:" 
+          echo "$TAGS"
+          for tag in $TAGS; do
+            echo "Tagging $SRC -> $tag"
+            docker tag "$SRC" "$tag"
+            docker push "$tag"
+          done
+      
+      # On PRs, we already ran tests above. No push.
