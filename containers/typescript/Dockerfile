@@ -19,7 +19,8 @@
 #  📁 Workspace: /workspace (inherited)
 ########################################################################
 
-FROM devcontainer-base-common:latest
+ARG BASE_IMAGE=devcontainer-base-common:latest
+FROM ${BASE_IMAGE}
 
 LABEL maintainer="you@example.com"
 

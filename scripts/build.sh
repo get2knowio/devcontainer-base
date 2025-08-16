@@ -367,15 +367,17 @@ main() {
         exit 0
     fi
     
-    # Parse arguments
-    if [[ -z "$1" ]]; then
-        echo -e "${RED}❌ Container type required.${NC}"
-        show_usage
-        exit 1
-    fi
-
-    local target="$1"
-    local custom_tag="$2"
+        # Parse arguments (default to building all if omitted)
+        local target
+        local custom_tag
+        if [[ -z "$1" ]]; then
+            target="all"
+            custom_tag=""
+            echo -e "${YELLOW}\u2139\ufe0f  No container type provided; defaulting to 'all'${NC}"
+        else
+            target="$1"
+            custom_tag="$2"
+        fi
 
     # Optional dry run: verify prerequisites for all
     if [[ "$custom_tag" == "--dry-run" ]]; then
