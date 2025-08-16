@@ -318,3 +318,40 @@ This script will:
 
 ## Build and Push Workflow
 This repository includes a GitHub Actions workflow (`.github/workflows/docker-build-push.yml`) to automatically build and push both Docker images to GHCR on changes to the `main` or `develop` branches, or when a new tag is created. The workflow uses a matrix strategy to build both Python and TypeScript variants in parallel.
+
+### CI Process (diagram)
+
+```mermaid
+flowchart TD
+  %% Trigger
+  Trigger["Trigger\n(push to main/develop or tag (v*) or pull_request)"]
+
+  %% Jobs
+  Test["test job\n(runs for push & PR; contains steps with step-level 'if')"]
+  PublishCommon["publish-common\n(needs: test; only on push/tag)"]
+  PublishChildren["publish-children\n(needs: publish-common; matrix: python, typescript)"]
+  PROnly["PR validation (inside test job)\n(run tests for PRs)"]
+  RunAgainstCI["Run tests against CI images\n(optional step in test on push)"]
+
+  %% Flow edges with conditions
+  Trigger --> Test
+  Test -->|on push/tag (step-level)| PublishCommon
+  PublishCommon --> PublishChildren
+  PublishChildren --> Done["Images published"]
+
+  %% PR path (test job runs PR-specific steps)
+  Trigger -->|pull_request| Test
+  Test -->|on pull_request| PROnly
+  PROnly --> PRDone["PR validation complete"]
+
+  %% Optional test run after building CI images on push
+  Test -->|on push: run tests against built CI images| RunAgainstCI
+  RunAgainstCI --> Done
+
+  style Trigger fill:#f3f4f6,stroke:#333
+  style Test fill:#fff7ed,stroke:#d69e00
+  style PublishCommon fill:#ecfdf5,stroke:#059669
+  style PublishChildren fill:#fff1f2,stroke:#be123c
+  style PROnly fill:#eff6ff,stroke:#0369a1
+  style Done fill:#eef2ff,stroke:#4338ca,stroke-dasharray: 5 5
+```
