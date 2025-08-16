@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="360" viewBox="0 0 1000 360">
+  <style>
+    .box { fill:#ffffff; stroke:#333; stroke-width:1.5; rx:6; }
+    .title { font: 700 14px/1.2 Arial, Helvetica, sans-serif; fill:#111827 }
+    .label { font: 400 12px/1.2 Arial, Helvetica, sans-serif; fill:#111827 }
+    .arrow { stroke:#555; stroke-width:2; fill:none; marker-end:url(#arrowhead);} 
+    .bg { fill:#f9fafb }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1000" height="360" rx="6"/>
+
+  <!-- Nodes -->
+  <g transform="translate(40,40)">
+    <rect class="box" x="0" y="0" width="200" height="56"/>
+    <text class="title" x="100" y="22" text-anchor="middle">Trigger</text>
+    <text class="label" x="100" y="40" text-anchor="middle">push/main/develop/tag/PR</text>
+  </g>
+
+  <g transform="translate(300,40)">
+    <rect class="box" x="0" y="0" width="200" height="56"/>
+    <text class="title" x="100" y="22" text-anchor="middle">test</text>
+    <text class="label" x="100" y="40" text-anchor="middle">runs for push & PR</text>
+  </g>
+
+  <g transform="translate(560,20)">
+    <rect class="box" x="0" y="0" width="220" height="44"/>
+    <text class="title" x="110" y="26" text-anchor="middle">publish-common</text>
+  </g>
+
+  <g transform="translate(560,100)">
+    <rect class="box" x="0" y="0" width="220" height="56"/>
+    <text class="title" x="110" y="24" text-anchor="middle">publish-children</text>
+    <text class="label" x="110" y="42" text-anchor="middle">matrix: python, typescript</text>
+  </g>
+
+  <g transform="translate(820,70)">
+    <rect class="box" x="0" y="0" width="140" height="44"/>
+    <text class="title" x="70" y="28" text-anchor="middle">Images published</text>
+  </g>
+
+  <g transform="translate(300,140)">
+    <rect class="box" x="0" y="0" width="200" height="48"/>
+    <text class="title" x="100" y="26" text-anchor="middle">PR validation</text>
+    <text class="label" x="100" y="42" text-anchor="middle">(PR-only steps in test)</text>
+  </g>
+
+  <g transform="translate(300,220)">
+    <rect class="box" x="0" y="0" width="200" height="48"/>
+    <text class="title" x="100" y="26" text-anchor="middle">Run tests against CI images</text>
+    <text class="label" x="100" y="42" text-anchor="middle">(push-only step)</text>
+  </g>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M240,68 L300,68"/>
+  <path class="arrow" d="M500,68 L560,42"/>
+  <path class="arrow" d="M780,42 L820,42"/>
+
+  <path class="arrow" d="M660,76 L660,100"/>
+  <path class="arrow" d="M780,128 L820,92"/>
+
+  <path class="arrow" d="M400,96 L400,140"/>
+  <path class="arrow" d="M400,188 L400,220"/>
+  <path class="arrow" d="M400,268 L700,268 L700,92"/>
+
+</svg>
