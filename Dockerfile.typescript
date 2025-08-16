@@ -132,6 +132,10 @@ RUN mkdir -p /etc/apt/keyrings && \
 # Add vscode user to docker group for Docker access
 RUN usermod -aG docker $USERNAME
 
+# Create a script to fix Docker socket permissions
+COPY docker-setup.sh /usr/local/bin/docker-setup.sh
+RUN chmod +x /usr/local/bin/docker-setup.sh
+
 # ------------------------------------------------------------------
 # Enhance Zsh configuration with modern tools
 # ------------------------------------------------------------------
@@ -337,4 +341,9 @@ RUN echo '# TypeScript development aliases' >> /home/vscode/.bashrc && \
 # ------------------------------------------------------------------
 WORKDIR /workspace
 
-CMD ["zsh"]
+# Switch back to vscode user
+USER vscode
+
+# Set up Docker socket permissions on container start
+ENTRYPOINT ["/usr/local/bin/docker-setup.sh"]
+CMD ["sleep", "infinity"]
