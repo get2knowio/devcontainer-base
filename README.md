@@ -322,36 +322,28 @@ This repository includes a GitHub Actions workflow (`.github/workflows/docker-bu
 ### CI Process (diagram)
 
 ```mermaid
-flowchart TD
+graph TD
   %% Trigger
-  Trigger["Trigger\n(push to main/develop or tag (v*) or pull_request)"]
+  TRIGGER[Trigger: push to main/develop or tag (v*) or pull_request]
 
   %% Jobs
-  Test["test job\n(runs for push & PR; contains steps with step-level 'if')"]
-  PublishCommon["publish-common\n(needs: test; only on push/tag)"]
-  PublishChildren["publish-children\n(needs: publish-common; matrix: python, typescript)"]
-  PROnly["PR validation (inside test job)\n(run tests for PRs)"]
-  RunAgainstCI["Run tests against CI images\n(optional step in test on push)"]
+  TEST[test job — runs for push & PR]
+  PUBLISH_COMMON[publish-common — needs: test (push only)]
+  PUBLISH_CHILDREN[publish-children — needs: publish-common (matrix: python, typescript)]
+  PR_ONLY[PR validation — runs inside test job for pull_request]
+  RUN_CI[Run tests against CI images — runs on push]
 
   %% Flow edges with conditions
-  Trigger --> Test
-  Test -->|on push/tag (step-level)| PublishCommon
-  PublishCommon --> PublishChildren
-  PublishChildren --> Done["Images published"]
+  TRIGGER --> TEST
+  TEST -->|push/tag| PUBLISH_COMMON
+  PUBLISH_COMMON --> PUBLISH_CHILDREN
+  PUBLISH_CHILDREN --> DONE[Images published]
 
-  %% PR path (test job runs PR-specific steps)
-  Trigger -->|pull_request| Test
-  Test -->|on pull_request| PROnly
-  PROnly --> PRDone["PR validation complete"]
+  %% PR path
+  TEST -->|pull_request| PR_ONLY
+  PR_ONLY --> PR_DONE[PR validation complete]
 
   %% Optional test run after building CI images on push
-  Test -->|on push: run tests against built CI images| RunAgainstCI
-  RunAgainstCI --> Done
-
-  style Trigger fill:#f3f4f6,stroke:#333
-  style Test fill:#fff7ed,stroke:#d69e00
-  style PublishCommon fill:#ecfdf5,stroke:#059669
-  style PublishChildren fill:#fff1f2,stroke:#be123c
-  style PROnly fill:#eff6ff,stroke:#0369a1
-  style Done fill:#eef2ff,stroke:#4338ca,stroke-dasharray: 5 5
+  TEST -->|push: run tests against built CI images| RUN_CI
+  RUN_CI --> DONE
 ```
