@@ -16,6 +16,12 @@
 #    • pnpm - fast, disk space efficient package manager
 #    • Yarn - alternative package manager
 #  
+#  🐳 Container Development:
+#    • Docker Engine with Docker-in-Docker (DinD) support
+#    • Docker Compose for multi-container applications
+#    • Docker Buildx for multi-platform builds
+#    • Full container lifecycle management capabilities
+#  
 #  ☁️ Cloud & Infrastructure:
 #    • AWS CLI v2 - unified command line interface for AWS services
 #  
@@ -66,10 +72,15 @@ ENV PATH="$BUN_INSTALL/bin:$PATH"
 # Python support (for tooling and polyglot development):
 #   • python3.12 - latest stable Python version
 #   • python3-pip - package installer for Python tools
+#
+# Docker support:
+#   • ca-certificates, gnupg, lsb-release - required for Docker repository setup
+#   • iptables - required for Docker networking
 RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
         eza bat ripgrep fd-find jq fzf \
         python3.12 python3-pip \
         build-essential \
+        ca-certificates gnupg lsb-release iptables \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/batcat /usr/bin/bat \
     && ln -sf /usr/bin/fdfind /usr/bin/fd \
@@ -99,6 +110,29 @@ RUN mkdir -p $USER_HOME/.config && \
     > $USER_HOME/.config/starship.toml
 
 # ------------------------------------------------------------------
+# Docker Engine - Docker-in-Docker (DinD) support
+# ------------------------------------------------------------------
+# Install Docker Engine to enable Docker-in-Docker functionality.
+# This allows building, running, and managing containers from within
+# the development container. Features include:
+#   • Full Docker CLI and daemon support
+#   • Container building and management
+#   • Docker Compose integration
+#   • Multi-architecture build support
+#   • Registry interaction (push/pull)
+# 
+# Architecture-aware installation ensures compatibility across platforms
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt update && \
+    apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Add vscode user to docker group for Docker access
+RUN usermod -aG docker $USERNAME
+
+# ------------------------------------------------------------------
 # Enhance Zsh configuration with modern tools
 # ------------------------------------------------------------------
 # Add Starship prompt and modern aliases to the existing Oh My Zsh setup
@@ -121,6 +155,9 @@ RUN echo 'eval "$(starship init zsh)"'                               >> $USER_HO
     echo 'fi'                                                        >> $USER_HOME/.zshrc && \
     echo 'if command -v bun >/dev/null 2>&1; then'                  >> $USER_HOME/.zshrc && \
     echo '    eval "$(bun completions zsh)"'                         >> $USER_HOME/.zshrc && \
+    echo 'fi'                                                        >> $USER_HOME/.zshrc && \
+    echo 'if command -v docker >/dev/null 2>&1; then'               >> $USER_HOME/.zshrc && \
+    echo '    eval "$(docker completion zsh)"'                       >> $USER_HOME/.zshrc && \
     echo 'fi'                                                        >> $USER_HOME/.zshrc
 
 # ------------------------------------------------------------------
@@ -251,7 +288,21 @@ RUN echo '# TypeScript development aliases' >> /home/vscode/.zshrc && \
     echo 'alias bi="bun install"' >> /home/vscode/.zshrc && \
     echo 'alias br="bun run"' >> /home/vscode/.zshrc && \
     echo 'alias bt="bun test"' >> /home/vscode/.zshrc && \
-    echo 'alias bd="bun run dev"' >> /home/vscode/.zshrc
+    echo 'alias bd="bun run dev"' >> /home/vscode/.zshrc && \
+    echo '' >> /home/vscode/.zshrc && \
+    echo '# Docker aliases' >> /home/vscode/.zshrc && \
+    echo 'alias d="docker"' >> /home/vscode/.zshrc && \
+    echo 'alias dc="docker compose"' >> /home/vscode/.zshrc && \
+    echo 'alias dcu="docker compose up"' >> /home/vscode/.zshrc && \
+    echo 'alias dcud="docker compose up -d"' >> /home/vscode/.zshrc && \
+    echo 'alias dcd="docker compose down"' >> /home/vscode/.zshrc && \
+    echo 'alias dcl="docker compose logs"' >> /home/vscode/.zshrc && \
+    echo 'alias dcp="docker compose ps"' >> /home/vscode/.zshrc && \
+    echo 'alias dps="docker ps"' >> /home/vscode/.zshrc && \
+    echo 'alias dpsa="docker ps -a"' >> /home/vscode/.zshrc && \
+    echo 'alias di="docker images"' >> /home/vscode/.zshrc && \
+    echo 'alias dv="docker volume ls"' >> /home/vscode/.zshrc && \
+    echo 'alias dn="docker network ls"' >> /home/vscode/.zshrc
 
 # Add same aliases to bash
 RUN echo '# TypeScript development aliases' >> /home/vscode/.bashrc && \
@@ -266,7 +317,20 @@ RUN echo '# TypeScript development aliases' >> /home/vscode/.bashrc && \
     echo 'alias bi="bun install"' >> /home/vscode/.bashrc && \
     echo 'alias br="bun run"' >> /home/vscode/.bashrc && \
     echo 'alias bt="bun test"' >> /home/vscode/.bashrc && \
-    echo 'alias bd="bun run dev"' >> /home/vscode/.bashrc
+    echo 'alias bd="bun run dev"' >> /home/vscode/.bashrc && \
+    echo '# Docker aliases' >> /home/vscode/.bashrc && \
+    echo 'alias d="docker"' >> /home/vscode/.bashrc && \
+    echo 'alias dc="docker compose"' >> /home/vscode/.bashrc && \
+    echo 'alias dcu="docker compose up"' >> /home/vscode/.bashrc && \
+    echo 'alias dcud="docker compose up -d"' >> /home/vscode/.bashrc && \
+    echo 'alias dcd="docker compose down"' >> /home/vscode/.bashrc && \
+    echo 'alias dcl="docker compose logs"' >> /home/vscode/.bashrc && \
+    echo 'alias dcp="docker compose ps"' >> /home/vscode/.bashrc && \
+    echo 'alias dps="docker ps"' >> /home/vscode/.bashrc && \
+    echo 'alias dpsa="docker ps -a"' >> /home/vscode/.bashrc && \
+    echo 'alias di="docker images"' >> /home/vscode/.bashrc && \
+    echo 'alias dv="docker volume ls"' >> /home/vscode/.bashrc && \
+    echo 'alias dn="docker network ls"' >> /home/vscode/.bashrc
 
 # ------------------------------------------------------------------
 # Ready for TypeScript development!
