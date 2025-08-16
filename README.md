@@ -1,6 +1,219 @@
-# devcontainer-base
+# DevContainer Base Images
 
-This repository provides base Docker images for use with Visual Studio Code's Dev Containers feature. The images are designed to simplify the setup of development environments by providing pre-configured containers with essential tools and dependencies for different development stacks.
+A comprehensive set of development container base images with modern tooling, built on Microsoft's DevContainer Ubuntu base image.
+
+## 🐳 Docker-in-Docker Testing Architecture
+
+This project uses a sophisticated testing approach with Docker-in-Docker support:
+
+```
+Host Machine
+├── DevContainer (Testing Environment)
+│   ├── Docker CLI + DevContainer CLI
+│   ├── test.sh (uses DevContainer CLI)
+│   └── Creates temporary containers to test:
+│       ├── TypeScript DevContainer
+│       └── Python DevContainer
+```
+
+## 🚀 Quick Start
+
+### 1. Open in DevContainer
+Open this project in VS Code and use "Dev Containers: Rebuild Container" to start the testing environment.
+
+### 2. Run Tests
+```bash
+# Test both images using DevContainer CLI
+./test.sh
+
+# Test specific image
+./test.sh typescript
+./test.sh python
+
+# Environment variable approach
+TEST_IMAGE=typescript ./test.sh
+```
+
+### 3. DevContainer Inception Testing
+For advanced testing with nested DevContainers:
+```bash
+./test-devcontainer-inception.sh
+```
+
+## 📦 Available Containers
+
+This repository provides multiple development container configurations, each optimized for specific development workflows:
+
+### Python Development Container (`containers/python/`)
+- **🐍 Python Ecosystem**: Python 3.12, Poetry, pip, virtual environments
+- **🌐 Node.js Support**: For polyglot development and modern tooling
+- **☁️ Cloud**: AWS CLI v2 for cloud development
+- **🌐 AI Tools**: Gemini CLI, Claude Code for AI-assisted development
+- **🛠️ Modern CLI Tools**: eza, fzf, bat, ripgrep, fd-find, jq
+- **🐳 Docker-in-Docker**: Full Docker Engine support
+- **🌟 Enhanced Shell**: Starship prompt with Oh My Zsh
+
+### TypeScript Development Container (`containers/typescript/`)
+- **🚀 JavaScript/TypeScript Ecosystem**: Node.js LTS, Bun, TypeScript, pnpm, Yarn
+- **� Python Support**: Python 3.12 for polyglot development and tooling
+- **☁️ Cloud**: AWS CLI v2 for cloud development
+- **🌐 AI Tools**: Gemini CLI, Claude Code for AI-assisted development
+- **🛠️ Modern CLI Tools**: eza, fzf, bat, ripgrep, fd-find, jq
+- **🐳 Docker-in-Docker**: Full Docker Engine support
+- **🌟 Enhanced Shell**: Starship prompt with Oh My Zsh
+
+## 🏗️ Building Container Images
+
+Use the provided build script to create Docker images from the devcontainer configurations:
+
+```bash
+# Build TypeScript container with default tag
+./scripts/build.sh typescript
+# or use the convenience wrapper:
+./build typescript
+
+# Build Python container with default tag  
+./scripts/build.sh python
+# or:
+./build python
+
+# Build with custom tag
+./build typescript my-typescript-image:v1.0
+./build python my-python-image:v1.0
+
+# Build and push to registry
+PUSH=true ./build typescript
+PUSH=true ./build python
+
+# Cross-platform build
+PLATFORM=linux/arm64 ./build typescript
+
+# Build without cache
+NO_CACHE=true ./build python
+```
+
+### Build Script Features
+- **✅ DevContainer CLI Integration**: Uses official DevContainer CLI for accurate builds
+- **🏗️ Multi-Container Support**: Supports both Python and TypeScript containers
+- **🚀 Cross-Platform**: Supports AMD64 and ARM64 architectures
+- **📦 Registry Push**: Optional automatic push to container registry
+- **🧪 Validation**: Built-in image validation and testing
+- **🔧 Flexible Configuration**: Environment variables for customization
+
+## 🧪 Testing Features
+
+### DevContainer CLI Integration
+- **Isolated Testing**: Each test runs in a fresh DevContainer environment
+- **Comprehensive Validation**: Tests Docker permissions, shell configs, and tool availability
+- **Detailed Reporting**: Clear pass/fail indicators with diagnostic information
+- **Docker-in-Docker Testing**: Validates nested Docker functionality
+
+### Test Scenarios
+- ✅ Tool installation and version checks
+- ✅ Docker socket access and permissions
+- ✅ Shell configuration and aliases
+- ✅ Docker command execution
+- ✅ Container build and run capabilities
+- ✅ AI tool availability
+
+## 🔧 Development
+
+### Project Structure
+The repository is organized with separate directories for each container type:
+
+```
+containers/
+├── python/
+│   ├── devcontainer.json       # Python container configuration
+│   └── Dockerfile              # Python container image definition
+└── typescript/
+    ├── devcontainer.json       # TypeScript container configuration
+    └── Dockerfile              # TypeScript container image definition
+
+scripts/
+├── build.sh                    # Multi-container build script
+└── test.sh                     # Comprehensive testing script
+
+build                           # Convenience wrapper for scripts/build.sh
+test                            # Convenience wrapper for scripts/test.sh
+.devcontainer/                  # Testing environment configuration
+```
+
+### Environment Setup
+The testing environment is a lightweight DevContainer with:
+- Docker-in-Docker feature enabled
+- Node.js LTS for DevContainer CLI
+- Proper Docker socket mounting
+
+### Test Structure
+```bash
+scripts/
+├── test.sh                     # Main test script using DevContainer CLI
+└── build.sh                   # Container build script
+
+.devcontainer/
+├── devcontainer.json           # Testing environment configuration
+└── setup.sh                   # Environment setup script
+test-devcontainer-inception.sh  # Advanced nested testing
+```
+
+## 🐳 Docker-in-Docker Architecture
+
+The testing setup uses proper DevContainer features for reliable Docker-in-Docker:
+
+```json
+{
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "version": "latest",
+            "enableNonRootDocker": "true"
+        }
+    },
+    "privileged": true,
+    "mounts": [
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+    ]
+}
+```
+
+## 🎯 Benefits
+
+1. **🔒 Isolated Testing**: No pollution of host environment
+2. **🧪 Reproducible**: Same environment every time
+3. **🚀 Fast Iteration**: Quick test cycles with DevContainer CLI
+4. **📊 Comprehensive**: Tests all aspects of container functionality
+5. **🛡️ Reliable**: Uses official DevContainer features for DinD
+
+## 🚀 Usage Examples
+
+```bash
+# Build containers (using convenience wrappers)
+./build typescript
+./build python
+
+# Or use the full script paths
+./scripts/build.sh typescript
+./scripts/build.sh python
+
+# Build with custom tags
+./build typescript my-ts-dev:latest
+./build python my-py-dev:latest
+
+# Run comprehensive tests
+./test
+# or:
+./scripts/test.sh
+
+# Test specific containers
+./test typescript
+./test python
+
+# Environment variable approach for testing
+TEST_IMAGE=typescript ./test
+TEST_IMAGE=python ./test
+```
+
+This approach provides robust testing of DevContainer configurations with proper Docker-in-Docker support! 🎉
 
 ## Available Images
 
@@ -80,18 +293,21 @@ To leverage these base images in your own project, you can create a `.devcontain
 To test the images locally before pushing changes, you can use the provided test script:
 
 ```bash
-# Test both images (build and test)
-./test.sh
+# Test both images (build and test) - using convenience wrapper
+./test
 
 # Test only the Python image
-./test.sh python
+./test python
 
 # Test only the TypeScript image  
-./test.sh typescript
+./test typescript
+
+# Or use the full script path
+./scripts/test.sh
 
 # Test a specific pre-built image
-./test.sh ghcr.io/get2knowio/devcontainer-python-base:latest
-./test.sh ghcr.io/get2knowio/devcontainer-typescript-base:latest
+./test ghcr.io/get2knowio/devcontainer-python-base:latest
+./test ghcr.io/get2knowio/devcontainer-typescript-base:latest
 ```
 
 This script will:

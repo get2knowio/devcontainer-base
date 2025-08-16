@@ -22,10 +22,10 @@ jobs:
       matrix:
         variant:
           - name: python
-            dockerfile: Dockerfile.python
+            dockerfile: containers/python/Dockerfile
             image_name: get2knowio/devcontainer-python-base
           - name: typescript
-            dockerfile: Dockerfile.typescript
+            dockerfile: containers/typescript/Dockerfile
             image_name: get2knowio/devcontainer-typescript-base
     permissions:
       contents: read
@@ -88,8 +88,8 @@ jobs:
           docker pull --platform linux/amd64 ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
           
           # Run tests
-          chmod +x ./test.sh
-          ./test.sh ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
+          chmod +x ./scripts/test.sh
+          ./scripts/test.sh ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:test-${{ github.sha }}
 
       - name: Tag and push final image
         if: github.event_name != 'pull_request'
@@ -124,8 +124,8 @@ jobs:
       - name: Test pull request image
         if: github.event_name == 'pull_request'
         run: |
-          chmod +x ./test.sh
-          ./test.sh ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:pr-test
+          chmod +x ./scripts/test.sh
+          ./scripts/test.sh ${{ env.REGISTRY }}/${{ matrix.variant.image_name }}:pr-test
 
       - name: Generate artifact attestation
         if: github.event_name != 'pull_request'

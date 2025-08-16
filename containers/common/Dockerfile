@@ -1,21 +1,15 @@
 ########################################################################
-#  Development Container - Python Base Image
+#  Development Container - Common Base Image
 #  
 #  A comprehensive development environment built on Microsoft's DevContainer
 #  base Ubuntu image with modern development tools and configurations.
+#  This base image contains all common functionality shared across language-
+#  specific containers.
 #  
 #  🐚 Shell & Prompt:
 #    • Zsh with Oh My Zsh (from base image)
 #    • Starship - minimal, blazing-fast, infinitely customizable prompt
 #    • Enhanced completions for all installed tools
-#  
-#  🐍 Python Ecosystem:
-#    • Python 3.12 with development headers
-#    • Poetry - modern dependency management and packaging
-#    • pip and venv support
-#  
-#  ☁️ Cloud & Infrastructure:
-#    • AWS CLI v2 - unified command line interface for AWS services
 #  
 #  🌐 Node.js Ecosystem:
 #    • Node.js LTS via nvm (Node Version Manager)
@@ -39,13 +33,11 @@ LABEL maintainer="you@example.com"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NVM_VERSION=0.40.3
-ENV POETRY_HOME=/opt/poetry
 
 # Set up user environment variables (using standard vscode user from base image)
 ENV USERNAME=vscode
 ENV USER_HOME=/home/$USERNAME
 ENV NVM_DIR=$USER_HOME/.nvm
-ENV PATH="$POETRY_HOME/bin:$PATH"
 
 # ------------------------------------------------------------------
 # Essential system packages and modern CLI tools
@@ -57,15 +49,8 @@ ENV PATH="$POETRY_HOME/bin:$PATH"
 #   • ripgrep - ultra-fast text search (grep replacement)
 #   • fd-find - intuitive find command replacement
 #   • jq - command-line JSON processor
-# 
-# Python development:
-#   • python3.12 - latest stable Python version
-#   • python3.12-venv - virtual environment support
-#   • python3.12-dev - headers for compiling Python extensions
-#   • python3-pip - package installer for Python
 RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
-        eza bat ripgrep fd-find jq fzf \
-        python3.12 python3.12-venv python3.12-dev python3-pip \
+        build-essential eza bat ripgrep fd-find jq fzf \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/batcat /usr/bin/bat \
     && ln -sf /usr/bin/fdfind /usr/bin/fd
@@ -113,55 +98,9 @@ RUN echo 'eval "$(starship init zsh)"'                               >> $USER_HO
     echo '    eval "$(npm completion zsh)"'                          >> $USER_HOME/.zshrc && \
     echo 'fi'                                                        >> $USER_HOME/.zshrc
 
-# ------------------------------------------------------------------
-# AWS CLI v2 - Amazon Web Services Command Line Interface
-# ------------------------------------------------------------------
-# AWS CLI v2 is the official command line interface for AWS services.
-# It provides:
-#   • Unified interface to all AWS services
-#   • Enhanced performance and stability over v1
-#   • Auto-completion support
-#   • Built-in pagination and output formatting
-#   • Session management and credential handling
-#   • Support for AWS SSO and modern authentication methods
-# 
-# Installation detects the target architecture and downloads the appropriate 
-# AWS CLI package for multi-architecture builds (amd64/arm64).
-ARG TARGETARCH
-RUN if [ "$TARGETARCH" = "amd64" ] || [ "$TARGETARCH" = "x86_64" ]; then \
-      curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"; \
-    elif [ "$TARGETARCH" = "arm64" ] || [ "$TARGETARCH" = "aarch64" ]; then \
-      curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"; \
-    else \
-      echo "Unsupported architecture: $TARGETARCH" && exit 1; \
-    fi && \
-    unzip awscliv2.zip && \
-    ./aws/install && \
-    rm -rf awscliv2.zip aws/
 
-# ------------------------------------------------------------------
-# Poetry - Python dependency management and packaging tool
-# ------------------------------------------------------------------
-# Poetry is a modern Python dependency management and packaging tool that:
-#   • Manages dependencies and virtual environments automatically
-#   • Uses pyproject.toml for modern Python project configuration
-#   • Provides deterministic dependency resolution
-#   • Simplifies package building and publishing
-#   • Integrates with version control and CI/CD systems
-#
-# Installed to /opt/poetry and symlinked to /usr/local/bin for global access
-# Shell completion is pre-generated during build for faster startup
-RUN curl -sSL https://install.python-poetry.org | python3 && \
-    ln -s $POETRY_HOME/bin/poetry /usr/local/bin/poetry
 
-# Generate Poetry completion during build for faster shell startup
-RUN mkdir -p $USER_HOME/.oh-my-zsh/completions && \
-    poetry completions zsh > $USER_HOME/.oh-my-zsh/completions/_poetry
-
-# Create python symlink while still root
-RUN ln -sf /usr/bin/python3 /usr/local/bin/python
-
-# Set ownership of all user files to vscode user
+# Set ownership of user files to vscode user (switching to non-root happens in child images)
 RUN chown -R $USERNAME:$USERNAME $USER_HOME
 
 # Switch to non-root user for remaining operations
@@ -193,14 +132,12 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v$NVM_VERSION/install.
 # ------------------------------------------------------------------
 # Configure shell environments for both bash and zsh
 # ------------------------------------------------------------------
-RUN echo 'alias python=python3' >> /home/vscode/.bashrc && \
-    echo 'alias python=python3' >> /home/vscode/.zshrc && \
-    echo 'export NVM_DIR="$HOME/.nvm"' >> /home/vscode/.bashrc && \
+RUN echo 'export NVM_DIR="$HOME/.nvm"' >> /home/vscode/.bashrc && \
     echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"' >> /home/vscode/.bashrc && \
     echo '[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"' >> /home/vscode/.bashrc
 
 # ------------------------------------------------------------------
-# Ready for work!
+# Set up workspace
 # ------------------------------------------------------------------
 WORKDIR /workspace
 
