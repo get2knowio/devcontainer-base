@@ -323,27 +323,21 @@ This repository includes a GitHub Actions workflow (`.github/workflows/docker-bu
 
 ```mermaid
 graph TD
-  %% Trigger
   TRIGGER[Trigger: push to main/develop or tag (v*) or pull_request]
 
-  %% Jobs
-  TEST[test job — runs for push & PR]
-  PUBLISH_COMMON[publish-common — needs: test (push only)]
-  PUBLISH_CHILDREN[publish-children — needs: publish-common (matrix: python, typescript)]
-  PR_ONLY[PR validation — runs inside test job for pull_request]
-  RUN_CI[Run tests against CI images — runs on push]
+  TEST[test job]
+  PUBLISH_COMMON[publish-common]
+  PUBLISH_CHILDREN[publish-children (matrix)]
+  PR_ONLY[PR validation (inside test job)]
+  RUN_CI[Run tests against CI images]
+  DONE[Images published]
 
-  %% Flow edges with conditions
   TRIGGER --> TEST
-  TEST -->|push/tag| PUBLISH_COMMON
+  TEST --> PUBLISH_COMMON
   PUBLISH_COMMON --> PUBLISH_CHILDREN
-  PUBLISH_CHILDREN --> DONE[Images published]
-
-  %% PR path
-  TEST -->|pull_request| PR_ONLY
+  PUBLISH_CHILDREN --> DONE
+  TEST --> PR_ONLY
   PR_ONLY --> PR_DONE[PR validation complete]
-
-  %% Optional test run after building CI images on push
-  TEST -->|push: run tests against built CI images| RUN_CI
+  TEST --> RUN_CI
   RUN_CI --> DONE
 ```
