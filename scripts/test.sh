@@ -14,8 +14,9 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Image names (must match scripts/build.sh defaults)
-TYPESCRIPT_IMAGE="devcontainer-typescript-base:latest"
-PYTHON_IMAGE="devcontainer-python-base:latest"
+# Allow override via env vars for CI (e.g., ghcr.io/...:ci-<sha>)
+TYPESCRIPT_IMAGE="${TYPESCRIPT_IMAGE:-devcontainer-typescript-base:latest}"
+PYTHON_IMAGE="${PYTHON_IMAGE:-devcontainer-python-base:latest}"
 
 verify_environment() {
     echo -e "${BLUE}🔍 Verifying testing environment...${NC}"
@@ -155,10 +156,12 @@ main() {
 
     local target="both"
     local do_build="true"
+    local do_dind_tests="true"
 
     # Env overrides
     if [[ -n "$TEST_IMAGE" ]]; then target="$TEST_IMAGE"; fi
     if [[ "$SKIP_BUILD" == "true" ]]; then do_build="false"; fi
+    if [[ "$DIND_TESTS" == "false" ]]; then do_dind_tests="false"; fi
 
     # Args
     while [[ $# -gt 0 ]]; do
@@ -207,33 +210,37 @@ main() {
         wait $t_pid || t_res=$?
     fi
 
-    # Run Docker-in-Docker tests for selected images (only if basic tests passed)
+    # Run Docker-in-Docker tests for selected images (only if enabled and basic tests passed)
     local pd_pid=0 td_pid=0
     local pd_res=0 td_res=0
-    if $run_py && [[ $p_res -eq 0 ]]; then
-        ( test_docker_in_docker "$PYTHON_IMAGE" ) & pd_pid=$!
-    fi
-    if $run_ts && [[ $t_res -eq 0 ]]; then
-        ( test_docker_in_docker "$TYPESCRIPT_IMAGE" ) & td_pid=$!
-    fi
+    if [[ "$do_dind_tests" == "true" ]]; then
+        if $run_py && [[ $p_res -eq 0 ]]; then
+            ( test_docker_in_docker "$PYTHON_IMAGE" ) & pd_pid=$!
+        fi
+        if $run_ts && [[ $t_res -eq 0 ]]; then
+            ( test_docker_in_docker "$TYPESCRIPT_IMAGE" ) & td_pid=$!
+        fi
 
-    if [[ $pd_pid -ne 0 ]]; then
-        wait $pd_pid || pd_res=$?
-    fi
-    if [[ $td_pid -ne 0 ]]; then
-        wait $td_pid || td_res=$?
+        if [[ $pd_pid -ne 0 ]]; then
+            wait $pd_pid || pd_res=$?
+        fi
+        if [[ $td_pid -ne 0 ]]; then
+            wait $td_pid || td_res=$?
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Skipping Docker-in-Docker tests (DIND_TESTS=false)${NC}"
     fi
 
     echo -e "\n${BLUE}=== Test Results ===${NC}"
     if $run_py; then
         [[ $p_res -eq 0 ]] && echo -e "${GREEN}✅ Python basic: PASSED${NC}" || echo -e "${RED}❌ Python basic: FAILED${NC}"
-        if [[ $p_res -eq 0 ]]; then
+        if [[ "$do_dind_tests" == "true" && $p_res -eq 0 ]]; then
             [[ $pd_res -eq 0 ]] && echo -e "${GREEN}✅ Python DinD: PASSED${NC}" || echo -e "${RED}❌ Python DinD: FAILED${NC}"
         fi
     fi
     if $run_ts; then
         [[ $t_res -eq 0 ]] && echo -e "${GREEN}✅ TypeScript basic: PASSED${NC}" || echo -e "${RED}❌ TypeScript basic: FAILED${NC}"
-        if [[ $t_res -eq 0 ]]; then
+        if [[ "$do_dind_tests" == "true" && $t_res -eq 0 ]]; then
             [[ $td_res -eq 0 ]] && echo -e "${GREEN}✅ TypeScript DinD: PASSED${NC}" || echo -e "${RED}❌ TypeScript DinD: FAILED${NC}"
         fi
     fi
@@ -241,10 +248,12 @@ main() {
     # Overall status requires both basic and DinD (when run) to pass
     local overall_ok=true
     if $run_py; then
-        if [[ $p_res -ne 0 || $pd_res -ne 0 ]]; then overall_ok=false; fi
+        if [[ $p_res -ne 0 ]]; then overall_ok=false; fi
+        if [[ "$do_dind_tests" == "true" && $pd_res -ne 0 ]]; then overall_ok=false; fi
     fi
     if $run_ts; then
-        if [[ $t_res -ne 0 || $td_res -ne 0 ]]; then overall_ok=false; fi
+        if [[ $t_res -ne 0 ]]; then overall_ok=false; fi
+        if [[ "$do_dind_tests" == "true" && $td_res -ne 0 ]]; then overall_ok=false; fi
     fi
 
     if $overall_ok; then

@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: read
+  packages: write
       id-token: write
 
     steps:
@@ -36,12 +36,81 @@ jobs:
         run: |
           npm install -g @devcontainers/cli
 
-      - name: Run tests (build + validate both images)
+      - name: Set up QEMU (for cross-arch)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image refs
+        id: refs
+        run: |
+          IMAGE_REPO_PREFIX="ghcr.io/get2knowio"
+          echo "prefix=$IMAGE_REPO_PREFIX" >> $GITHUB_OUTPUT
+          echo "commonRepo=$IMAGE_REPO_PREFIX/devcontainer-base-common" >> $GITHUB_OUTPUT
+          echo "pyRepo=$IMAGE_REPO_PREFIX/devcontainer-python-base" >> $GITHUB_OUTPUT
+          echo "tsRepo=$IMAGE_REPO_PREFIX/devcontainer-typescript-base" >> $GITHUB_OUTPUT
+          echo "ciTag=ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          echo "pyFull=$IMAGE_REPO_PREFIX/devcontainer-python-base:ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          echo "tsFull=$IMAGE_REPO_PREFIX/devcontainer-typescript-base:ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build and push multi-arch images (common)
+        if: github.event_name != 'pull_request'
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: containers/common/devcontainer.json
+          imageName: ${{ steps.refs.outputs.commonRepo }}
+          imageTag: ${{ steps.refs.outputs.ciTag }}
+          platform: linux/amd64,linux/arm64
+          push: always
+
+      - name: Build and push multi-arch images (python)
+        if: github.event_name != 'pull_request'
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: containers/python/devcontainer.json
+          imageName: ${{ steps.refs.outputs.pyRepo }}
+          imageTag: ${{ steps.refs.outputs.ciTag }}
+          platform: linux/amd64,linux/arm64
+          push: always
+
+      - name: Build and push multi-arch images (typescript)
+        if: github.event_name != 'pull_request'
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: containers/typescript/devcontainer.json
+          imageName: ${{ steps.refs.outputs.tsRepo }}
+          imageTag: ${{ steps.refs.outputs.ciTag }}
+          platform: linux/amd64,linux/arm64
+          push: always
+
+      - name: Run tests (build + validate both images) [PRs]
+        if: github.event_name == 'pull_request'
         run: |
           chmod +x ./scripts/*.sh || true
           chmod +x ./build ./build.sh ./test || true
           chmod +x ./scripts/test.sh
           ./scripts/test.sh --build
+
+      - name: Run tests against CI images [push/tags]
+        if: github.event_name != 'pull_request'
+        env:
+          TYPESCRIPT_IMAGE: ${{ steps.refs.outputs.tsFull }}
+          PYTHON_IMAGE: ${{ steps.refs.outputs.pyFull }}
+          SKIP_BUILD: true
+          DIND_TESTS: false
+        run: |
+          chmod +x ./scripts/*.sh || true
+          chmod +x ./build ./build.sh ./test || true
+          chmod +x ./scripts/test.sh
+          ./scripts/test.sh
   
   publish-common:
     if: github.event_name != 'pull_request'
@@ -69,9 +138,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install DevContainer CLI
-        run: npm install -g @devcontainers/cli
 
       - name: Image repo name (common)
         id: imagename
@@ -101,14 +167,12 @@ jobs:
           echo "image_repo=$image_repo" >> $GITHUB_OUTPUT
           echo "tag_only=$tag_only" >> $GITHUB_OUTPUT
 
-      - name: Build and push multi-arch image (via DevContainer CLI)
-        uses: devcontainers/ci@v0.3
-        with:
-          configFile: containers/common/devcontainer.json
-          imageName: ${{ steps.canonical.outputs.image_repo }}
-          imageTag: ${{ steps.canonical.outputs.tag_only }}
-          platform: linux/amd64,linux/arm64
-          push: always
+      - name: Promote CI image to canonical tag (manifest)
+        run: |
+          src_tag="${{ steps.imagename.outputs.repo }}:ci-${{ github.sha }}"
+          dst_tag='${{ steps.canonical.outputs.canonical_ref }}'
+          echo "Promoting $src_tag -> $dst_tag"
+          docker buildx imagetools create --tag "$dst_tag" "$src_tag"
 
       - name: Retag and publish additional tags as manifest list
         if: ${{ steps.meta.outputs.tags != '' }}
@@ -156,9 +220,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install DevContainer CLI
-        run: npm install -g @devcontainers/cli
-
       - name: Image repo name
         id: imagename
         run: |
@@ -191,14 +252,12 @@ jobs:
           echo "image_repo=$image_repo" >> $GITHUB_OUTPUT
           echo "tag_only=$tag_only" >> $GITHUB_OUTPUT
 
-      - name: Build and push multi-arch image (via DevContainer CLI)
-        uses: devcontainers/ci@v0.3
-        with:
-          configFile: containers/${{ matrix.container }}/devcontainer.json
-          imageName: ${{ steps.canonical.outputs.image_repo }}
-          imageTag: ${{ steps.canonical.outputs.tag_only }}
-          platform: linux/amd64,linux/arm64
-          push: always
+      - name: Promote CI image to canonical tag (manifest)
+        run: |
+          src_tag="${{ steps.imagename.outputs.repo }}:ci-${{ github.sha }}"
+          dst_tag='${{ steps.canonical.outputs.canonical_ref }}'
+          echo "Promoting $src_tag -> $dst_tag"
+          docker buildx imagetools create --tag "$dst_tag" "$src_tag"
 
       - name: Retag and publish additional tags as manifest list
         if: ${{ steps.meta.outputs.tags != '' }}
