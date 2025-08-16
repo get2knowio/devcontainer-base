@@ -16,12 +16,18 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  test:
+  # Build common base image first (dependency for python/typescript)
+  build-common:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
       id-token: write
+    outputs:
+      common-image: ${{ steps.refs.outputs.commonFull }}
+      ci-tag: ${{ steps.refs.outputs.ciTag }}
+      prefix: ${{ steps.refs.outputs.prefix }}
 
     steps:
       - name: Checkout repository
@@ -55,14 +61,10 @@ jobs:
           IMAGE_REPO_PREFIX="ghcr.io/get2knowio"
           echo "prefix=$IMAGE_REPO_PREFIX" >> $GITHUB_OUTPUT
           echo "commonRepo=$IMAGE_REPO_PREFIX/devcontainer-base-common" >> $GITHUB_OUTPUT
-          echo "pyRepo=$IMAGE_REPO_PREFIX/devcontainer-python-base" >> $GITHUB_OUTPUT
-          echo "tsRepo=$IMAGE_REPO_PREFIX/devcontainer-typescript-base" >> $GITHUB_OUTPUT
           echo "ciTag=ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
-          echo "pyFull=$IMAGE_REPO_PREFIX/devcontainer-python-base:ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
-          echo "tsFull=$IMAGE_REPO_PREFIX/devcontainer-typescript-base:ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          echo "commonFull=$IMAGE_REPO_PREFIX/devcontainer-base-common:ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
 
-      - name: Build and push multi-arch images (common)
-        if: github.event_name != 'pull_request'
+      - name: Build and push multi-arch common image
         uses: devcontainers/ci@v0.3
         with:
           configFile: containers/common/devcontainer.json
@@ -71,25 +73,105 @@ jobs:
           platform: linux/amd64,linux/arm64
           push: always
 
-      - name: Build and push multi-arch images (python)
-        if: github.event_name != 'pull_request'
+  # Build language-specific images in parallel (depends on common)
+  build-languages:
+    if: github.event_name != 'pull_request'
+    needs: [build-common]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      matrix:
+        container: [python, typescript]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (for DevContainer CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install DevContainer CLI
+        run: |
+          npm install -g @devcontainers/cli
+
+      - name: Set up QEMU (for cross-arch)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image refs
+        id: refs
+        run: |
+          case "${{ matrix.container }}" in
+            python) 
+              repo="${{ needs.build-common.outputs.prefix }}/devcontainer-python-base"
+              ;;
+            typescript) 
+              repo="${{ needs.build-common.outputs.prefix }}/devcontainer-typescript-base"
+              ;;
+          esac
+          echo "repo=$repo" >> $GITHUB_OUTPUT
+          echo "full=$repo:${{ needs.build-common.outputs.ci-tag }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push multi-arch language image
         uses: devcontainers/ci@v0.3
         with:
-          configFile: containers/python/devcontainer.json
-          imageName: ${{ steps.refs.outputs.pyRepo }}
-          imageTag: ${{ steps.refs.outputs.ciTag }}
+          configFile: containers/${{ matrix.container }}/devcontainer.json
+          imageName: ${{ steps.refs.outputs.repo }}
+          imageTag: ${{ needs.build-common.outputs.ci-tag }}
           platform: linux/amd64,linux/arm64
           push: always
 
-      - name: Build and push multi-arch images (typescript)
-        if: github.event_name != 'pull_request'
-        uses: devcontainers/ci@v0.3
+  # Test built images (or build locally for PRs)
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    needs: [build-common, build-languages]
+    if: always() && (github.event_name == 'pull_request' || (needs.build-common.result == 'success' && needs.build-languages.result == 'success'))
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (for DevContainer CLI)
+        uses: actions/setup-node@v4
         with:
-          configFile: containers/typescript/devcontainer.json
-          imageName: ${{ steps.refs.outputs.tsRepo }}
-          imageTag: ${{ steps.refs.outputs.ciTag }}
-          platform: linux/amd64,linux/arm64
-          push: always
+          node-version: 'lts/*'
+
+      - name: Install DevContainer CLI
+        run: |
+          npm install -g @devcontainers/cli
+
+      - name: Set up QEMU (for cross-arch)
+        if: github.event_name == 'pull_request'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests (build + validate both images) [PRs]
         if: github.event_name == 'pull_request'
@@ -102,8 +184,8 @@ jobs:
       - name: Run tests against CI images [push/tags]
         if: github.event_name != 'pull_request'
         env:
-          TYPESCRIPT_IMAGE: ${{ steps.refs.outputs.tsFull }}
-          PYTHON_IMAGE: ${{ steps.refs.outputs.pyFull }}
+          TYPESCRIPT_IMAGE: ${{ needs.build-common.outputs.prefix }}/devcontainer-typescript-base:${{ needs.build-common.outputs.ci-tag }}
+          PYTHON_IMAGE: ${{ needs.build-common.outputs.prefix }}/devcontainer-python-base:${{ needs.build-common.outputs.ci-tag }}
           SKIP_BUILD: true
           DIND_TESTS: false
         run: |
@@ -125,9 +207,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up QEMU (for cross-arch)
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -206,9 +285,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up QEMU (for cross-arch)
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

@@ -323,20 +323,73 @@ This repository includes a GitHub Actions workflow (`.github/workflows/docker-bu
 
 ```mermaid
 flowchart LR
-    A[Trigger: push/tag/PR] --> B[test job]
-    B --> C[publish-common]
-    C --> D[publish-children matrix]
-    D --> E[Images published]
-    
-    B --> F[PR validation steps]
-    F --> G[PR complete]
-    
-    B --> H[Test CI images]
-    H --> E
+    A[Trigger: push/tag/PR] --> B{Event type}
+    B -->|push/tag| C[build-common]
+    B -->|PR| F[test job: build locally]
+    C --> D[build-languages matrix]
+    D --> E[test: validate CI images]
+    E --> G[publish-common]
+    G --> H[publish-children matrix]
+    H --> I[Images published]
+    F --> J[PR validation complete]
 ```
 
-**Flow conditions:**
-- `test` runs for both `push` and `pull_request` events
-- `publish-common` and `publish-children` only run when `github.event_name != 'pull_request'` (push/tag)
-- `publish-children` is a matrix job (python, typescript)
-- Some steps inside `test` are conditional: PR-only validation steps and push-only test runs against CI images
+**Detailed flow explanation:**
+
+**1. Trigger Events:**
+- **Push to main/develop**: Runs optimized build pipeline (build-common → build-languages → test → publish-common → publish-children)
+- **Tag creation (v*)**: Runs same optimized pipeline with version-specific tagging
+- **Pull Request**: Runs only the `test` job with local builds and PR-specific validation steps
+
+**2. Build-Common Job (push/tag only):**
+- **Setup**: Installs DevContainer CLI, sets up QEMU and Docker Buildx, logs into GHCR
+- **Purpose**: Builds the base common image that python/typescript extend from
+- **Process**: Builds and pushes `devcontainer-base-common` with `ci-{SHA}` tag
+- **Multi-platform**: Uses `platform: linux/amd64,linux/arm64` via DevContainers CI action
+- **Output**: Provides image references and CI tag for dependent jobs
+
+**3. Build-Languages Job (push/tag only):**
+- **Depends on**: `build-common` job completion
+- **Matrix strategy**: Runs in parallel for `python` and `typescript` containers (2x parallelization)
+- **Setup**: Each matrix job sets up QEMU and Docker Buildx for cross-architecture builds
+- **Purpose**: Builds language-specific images that depend on the common base
+- **Multi-platform**: Each matrix job builds both amd64 and arm64 architectures simultaneously
+- **Efficiency**: Parallelizes the heavy building work instead of lightweight retagging
+
+**4. Test Job:**
+- **Depends on**: Both `build-common` and `build-languages` completion (for push/tag) or runs standalone (for PR)
+- **For Push/Tag events**:
+  - Tests the newly built CI images with multi-arch manifest lists
+  - Uses pre-built images from previous steps (no building, just validation)
+- **For Pull Request events**:
+  - Builds images locally with full cross-platform setup
+  - Runs comprehensive validation tests to ensure PRs don't break functionality
+
+**5. Publish-Common Job (push/tag only):**
+- **Depends on**: `test` job completion
+- **Setup**: Sets up Docker Buildx (no QEMU needed - just retagging existing manifest lists)
+- **Purpose**: Promotes the CI common image to canonical tags (latest, version tags)
+- **Process**: Uses `docker buildx imagetools` to retag `ci-{SHA}` → `latest`, `main`, `v1.2.3`, etc.
+- **Multi-platform handling**: Promotes the entire manifest list (both amd64 and arm64 images together)
+
+**6. Publish-Children Job (push/tag only):**
+- **Depends on**: `publish-common` job completion
+- **Setup**: Each matrix job sets up Docker Buildx (no QEMU needed - just retagging)
+- **Matrix strategy**: Runs in parallel for `python` and `typescript` containers
+- **Purpose**: Promotes language-specific CI images to their canonical tags
+- **Process**: Similar retagging process for `devcontainer-python-base` and `devcontainer-typescript-base`
+- **Multi-platform handling**: Each matrix job promotes its own multi-arch manifest list
+
+**Key Optimizations:**
+- **Build Parallelization**: Heavy building work (steps 2-3) is parallelized, not lightweight retagging (steps 5-6)
+- **Dependency Management**: Common base is built first, then language variants can build in parallel
+- **Resource Efficiency**: QEMU setup only where needed (building), not for simple image retagging
+- **Matrix Strategy**: Used for actual parallel work (2 language builds) rather than sequential retagging
+
+**Multi-Platform Architecture Support:**
+- **Target Platforms**: `linux/amd64` and `linux/arm64` (supports both Intel/AMD and Apple Silicon)
+- **Build Strategy**: Uses Docker Buildx with QEMU emulation for cross-compilation (in build jobs)
+- **Manifest Lists**: Each published image is actually a manifest list containing both architectures
+- **DevContainers CI Integration**: The `devcontainers/ci@v0.3` action handles multi-platform builds automatically
+- **Promotion Process**: `docker buildx imagetools` preserves and copies the multi-arch manifest when retagging (no building/QEMU needed)
+- **Runtime**: Docker automatically pulls the correct architecture variant based on the host platform
