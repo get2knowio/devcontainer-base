@@ -320,10 +320,23 @@ This script will:
 This repository includes a GitHub Actions workflow (`.github/workflows/docker-build-push.yml`) to automatically build and push both Docker images to GHCR on changes to the `main` or `develop` branches, or when a new tag is created. The workflow uses a matrix strategy to build both Python and TypeScript variants in parallel.
 
 ### CI Process (diagram)
-![CI Process diagram](./docs/ci-diagram.svg)
 
-Legend (conditions):
-- `test` runs for both `push` and `pull_request` events.
-- `publish-common` and `publish-children` only run when `github.event_name != 'pull_request'` (push/tag).
-- `publish-children` is a matrix job (python, typescript).
-- Some steps inside `test` are conditional: PR-only validation steps and push-only test runs against CI images.
+```mermaid
+flowchart LR
+    A[Trigger: push/tag/PR] --> B[test job]
+    B --> C[publish-common]
+    C --> D[publish-children matrix]
+    D --> E[Images published]
+    
+    B --> F[PR validation steps]
+    F --> G[PR complete]
+    
+    B --> H[Test CI images]
+    H --> E
+```
+
+**Flow conditions:**
+- `test` runs for both `push` and `pull_request` events
+- `publish-common` and `publish-children` only run when `github.event_name != 'pull_request'` (push/tag)
+- `publish-children` is a matrix job (python, typescript)
+- Some steps inside `test` are conditional: PR-only validation steps and push-only test runs against CI images
