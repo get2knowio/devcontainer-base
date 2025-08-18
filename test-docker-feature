@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience wrapper for scripts/test-docker-feature.sh
+exec "$(dirname "$0")/scripts/test-docker-feature.sh" "$@"

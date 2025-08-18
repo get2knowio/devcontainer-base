@@ -15,15 +15,9 @@ npm install -g @devcontainers/cli
 echo "✅ DevContainer CLI version:"
 devcontainer --version
 
-# Install additional testing tools
-echo "📦 Installing additional testing tools..."
-npm install -g jq
-
 # Make test scripts executable
-chmod +x test.sh
-if [ -f docker-setup.sh ]; then
-    chmod +x docker-setup.sh
-fi
+chmod +x scripts/test.sh
+chmod +x scripts/build.sh
 
 # Verify Docker access
 echo "🐳 Verifying Docker access..."
@@ -34,5 +28,6 @@ echo "🎉 DevContainer testing environment setup complete!"
 echo ""
 echo "Available commands:"
 echo "  devcontainer --help    # DevContainer CLI help"
-echo "  ./test.sh              # Run container tests"
+echo "  build                  # Build the containers"
+echo "  test                   # Run container tests"
 echo "  docker version         # Verify Docker access"

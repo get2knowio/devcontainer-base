@@ -40,6 +40,18 @@ For advanced testing with nested DevContainers:
 ./test-devcontainer-inception.sh
 ```
 
+### 4. Docker-in-Docker Feature Testing
+To test Docker-in-Docker feature installation specifically:
+```bash
+# Test Docker-in-Docker feature connectivity and installation
+./test-docker-feature
+
+# This will:
+# - Test network connectivity to required endpoints
+# - Build a minimal container with Docker-in-Docker feature
+# - Verify Docker functionality inside the container
+```
+
 ## 📦 Available Containers
 
 This repository provides multiple development container configurations, each optimized for specific development workflows:
@@ -393,3 +405,58 @@ flowchart LR
 - **DevContainers CI Integration**: The `devcontainers/ci@v0.3` action handles multi-platform builds automatically
 - **Promotion Process**: `docker buildx imagetools` preserves and copies the multi-arch manifest when retagging (no building/QEMU needed)
 - **Runtime**: Docker automatically pulls the correct architecture variant based on the host platform
+
+## 🔧 Troubleshooting
+
+### Docker-in-Docker Issues
+
+If you encounter issues with Docker-in-Docker feature installation during CI builds, the project includes several resilience improvements:
+
+#### Network Connectivity Issues
+If you see errors like:
+```
+OpenSSL SSL_connect: SSL_ERROR_SYSCALL in connection to packages.microsoft.com:443
+gpg: no valid OpenPGP data found.
+ERROR: Feature "Docker (Docker-in-Docker)" failed to install!
+```
+
+**Troubleshooting steps:**
+
+1. **Test connectivity locally:**
+   ```bash
+   ./test-docker-feature
+   ```
+
+2. **Check the CI warm-up step** in GitHub Actions logs - this pre-tests connectivity
+
+3. **Retry the workflow** - networking issues are often transient
+
+#### Configuration Improvements
+
+The project includes several improvements to handle networking issues:
+
+- **Docker-in-Docker Feature**: Uses specific version (`24.0`) instead of `latest` for stability
+- **APT Configuration**: Automatic retries (3x) and extended timeouts (60s) for package downloads
+- **Curl Settings**: Extended timeout settings for feature installations
+- **CI Environment Variables**: Network resilience settings for multi-arch builds
+
+#### Local Development
+
+For local development issues:
+
+```bash
+# Test the build locally
+./build typescript
+
+# Test with Docker feature specifically
+./test-docker-feature
+
+# Build without cache to ensure fresh installation
+NO_CACHE=true ./build typescript
+```
+
+### General DevContainer Issues
+
+- **VS Code Extension**: Ensure you have the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) installed
+- **Docker Requirements**: Docker Desktop must be running and accessible
+- **Memory Requirements**: Multi-arch builds require sufficient memory (recommend 4GB+ available)

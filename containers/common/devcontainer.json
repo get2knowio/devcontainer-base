@@ -2,13 +2,17 @@
   "name": "DevContainer Base Common Image",
   "build": {
     "dockerfile": "Dockerfile",
-    "context": "."
+    "context": ".",
+    "args": {
+      "BUILDKIT_INLINE_CACHE": "1"
+    }
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "latest",
+      "version": "24.0",
       "enableNonRootDocker": "true",
-      "moby": "true"
+      "moby": "true",
+      "dockerDashComposeVersion": "v2"
     },
     "ghcr.io/devcontainers/features/aws-cli:1": {
       "version": "latest"

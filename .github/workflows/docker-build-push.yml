@@ -55,6 +55,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Warm up Docker environment
+        run: |
+          # Pull base image to warm up Docker and check connectivity
+          docker pull mcr.microsoft.com/devcontainers/base:ubuntu-24.04 || echo "Base image pull failed, continuing..."
+          # Test connectivity to common endpoints
+          curl -fsSL --connect-timeout 10 --retry 3 https://packages.microsoft.com || echo "Microsoft packages connectivity test failed"
+
       - name: Compute image refs
         id: refs
         run: |
@@ -72,6 +79,16 @@ jobs:
           imageTag: ${{ steps.refs.outputs.ciTag }}
           platform: linux/amd64,linux/arm64
           push: always
+          skipContainerUserIdUpdate: true
+          cacheFrom: ${{ steps.refs.outputs.commonRepo }}:ci-${{ github.sha }}
+        env:
+          BUILDKIT_PROGRESS: plain
+          DOCKER_BUILDKIT: 1
+          # Network resilience for feature installation
+          CURL_CONNECT_TIMEOUT: 60
+          CURL_MAX_TIME: 300
+          # Retry settings for package downloads
+          APT_ACQUIRE_RETRIES: 3
 
   # Build language-specific images in parallel (depends on common)
   build-languages:
@@ -134,6 +151,16 @@ jobs:
           imageTag: ${{ needs.build-common.outputs.ci-tag }}
           platform: linux/amd64,linux/arm64
           push: always
+          skipContainerUserIdUpdate: true
+          cacheFrom: ${{ steps.refs.outputs.repo }}:ci-${{ github.sha }}
+        env:
+          BUILDKIT_PROGRESS: plain
+          DOCKER_BUILDKIT: 1
+          # Network resilience for feature installation
+          CURL_CONNECT_TIMEOUT: 60
+          CURL_MAX_TIME: 300
+          # Retry settings for package downloads
+          APT_ACQUIRE_RETRIES: 3
 
   # Test built images (or build locally for PRs)
   test:

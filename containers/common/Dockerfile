@@ -33,6 +33,9 @@ LABEL maintainer="you@example.com"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NVM_VERSION=0.40.3
+# Add network resilience settings for feature installation
+ENV CURL_CONNECT_TIMEOUT=60
+ENV CURL_MAX_TIME=300
 
 # Set up user environment variables (using standard vscode user from base image)
 ENV USERNAME=vscode
@@ -42,6 +45,11 @@ ENV NVM_DIR=$USER_HOME/.nvm
 # ------------------------------------------------------------------
 # Essential system packages and modern CLI tools
 # ------------------------------------------------------------------
+# Update package manager configuration for better reliability
+RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "60";' > /etc/apt/apt.conf.d/80-timeouts && \
+    echo 'Acquire::https::Timeout "60";' >> /etc/apt/apt.conf.d/80-timeouts
+
 # Modern CLI replacements and tools (base image already has git, curl, etc.):
 #   • eza - modern ls replacement with Git integration and colors
 #   • fzf - command-line fuzzy finder for interactive searching
