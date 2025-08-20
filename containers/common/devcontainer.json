@@ -8,7 +8,9 @@
     }
   },
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": true
+    },
     "ghcr.io/devcontainers/features/aws-cli:1": {
       "version": "latest"
     }
