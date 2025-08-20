@@ -1,0 +1,5 @@
+# act configuration file
+# This configures act to use appropriate container images for testing
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+-P ubuntu-22.04=catthehacker/ubuntu:act-22.04
+-P ubuntu-20.04=catthehacker/ubuntu:act-20.04
