@@ -77,7 +77,7 @@ jobs:
           imageName: ${{ steps.refs.outputs.commonRepo }}
           imageTag: ${{ steps.refs.outputs.ciTag }}
           platform: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && 'always' || 'never' }}
           skipContainerUserIdUpdate: true
           cacheFrom: ${{ steps.refs.outputs.commonRepo }}:ci-${{ github.sha }}
         env:
@@ -156,7 +156,7 @@ jobs:
           imageName: ${{ steps.refs.outputs.repo }}
           imageTag: ${{ needs.build-common.outputs.ci-tag }}
           platform: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && 'always' || 'never' }}
           skipContainerUserIdUpdate: true
           cacheFrom: ${{ steps.refs.outputs.repo }}:ci-${{ github.sha }}
         env:
