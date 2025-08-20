@@ -95,6 +95,9 @@ test_python_image() {
         echo "User: $(whoami)"
         echo "Home: $HOME"
 
+        # Add Poetry to PATH for testing
+        export PATH="/usr/local/py-utils/bin:$PATH"
+
         command -v python3 >/dev/null 2>&1 && echo "✅ Python: $(python3 --version)" || { echo "❌ Python missing"; exit 1; }
         command -v pip3    >/dev/null 2>&1 && echo "✅ pip: $(pip3 --version)"      || { echo "❌ pip missing"; exit 1; }
         command -v poetry  >/dev/null 2>&1 && echo "✅ Poetry: $(poetry --version)" || { echo "❌ Poetry missing"; exit 1; }
