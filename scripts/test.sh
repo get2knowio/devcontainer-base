@@ -54,7 +54,7 @@ test_typescript_image() {
         echo -e "${RED}❌ Image $image_name not found${NC}"
         return 1
     fi
-    if docker run --rm "$image_name" bash -c '
+    if docker run --rm --privileged "$image_name" bash -c '
         set -e
         echo "=== TypeScript Image Tests ==="
         echo "User: $(whoami)"
@@ -89,7 +89,7 @@ test_python_image() {
         echo -e "${RED}❌ Image $image_name not found${NC}"
         return 1
     fi
-    if docker run --rm "$image_name" bash -c '
+    if docker run --rm --privileged "$image_name" bash -c '
         set -e
         echo "=== Python Image Tests ==="
         echo "User: $(whoami)"

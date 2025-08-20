@@ -8,13 +8,16 @@
     }
   },
   "features": {
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
-      "moby": true
-    },
     "ghcr.io/devcontainers/features/aws-cli:1": {
       "version": "latest"
     }
   },
+  "runArgs": [
+    "--privileged"
+  ],
+  "overrideCommand": false,
+  "init": true,
+  "privileged": true,
   "remoteUser": "vscode",
   "workspaceFolder": "/workspace"
 }

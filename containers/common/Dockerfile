@@ -11,6 +11,12 @@
 #    • Starship - minimal, blazing-fast, infinitely customizable prompt
 #    • Enhanced completions for all installed tools
 #  
+#  🐳 Docker Engine:
+#    • Full Docker-in-Docker support with Docker Engine
+#    • Docker Compose v2 for multi-container applications
+#    • Docker Buildx for multi-platform image builds
+#    • Automatic daemon startup and container management
+#  
 #  🌐 Node.js Ecosystem:
 #    • Node.js LTS via nvm (Node Version Manager)
 #    • Gemini CLI - Google's generative AI command line tool
@@ -59,9 +65,93 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
 #   • jq - command-line JSON processor
 RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
         build-essential eza bat ripgrep fd-find jq fzf \
+        # Docker prerequisites
+        apt-transport-https ca-certificates gnupg lsb-release iptables \
     && apt-get clean && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/batcat /usr/bin/bat \
     && ln -sf /usr/bin/fdfind /usr/bin/fd
+
+# ------------------------------------------------------------------
+# Docker Engine installation (Docker-in-Docker setup)
+# ------------------------------------------------------------------
+# Install Docker Engine directly to avoid DevContainer feature SSL issues.
+# This provides full Docker functionality including:
+#   • Docker daemon (dockerd)
+#   • Docker CLI client
+#   • Docker Compose v2
+#   • Docker Buildx for multi-platform builds
+#
+# Uses Docker's official Ubuntu repository for reliable installation
+# and configures the docker group for non-root access.
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt update && \
+    apt install -y --no-install-recommends \
+        docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Create docker group and add vscode user to it
+RUN groupadd -f docker && usermod -aG docker $USERNAME
+
+# Configure Docker daemon for development
+# - Enable BuildKit for improved build performance
+# - Set up default address pools for better network isolation
+# - Configure storage driver for optimal performance
+RUN mkdir -p /etc/docker && \
+    echo '{\n\
+  "features": { "buildkit": true },\n\
+  "default-address-pools": [\n\
+    { "base": "172.17.0.0/16", "size": 24 },\n\
+    { "base": "172.18.0.0/16", "size": 24 }\n\
+  ],\n\
+  "storage-driver": "vfs",\n\
+  "log-driver": "json-file",\n\
+  "log-opts": {\n\
+    "max-size": "10m",\n\
+    "max-file": "3"\n\
+  }\n\
+}' > /etc/docker/daemon.json
+
+# Create Docker init script for container startup
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+# Start Docker daemon in background if not already running\n\
+if [ ! -S /var/run/docker.sock ]; then\n\
+    echo "Starting Docker daemon..."\n\
+    # Clean up any existing docker daemon processes\n\
+    sudo pkill dockerd || true\n\
+    \n\
+    # Start Docker daemon in background\n\
+    sudo nohup dockerd \\\n\
+        --host=unix:///var/run/docker.sock \\\n\
+        --host=tcp://0.0.0.0:2376 \\\n\
+        --userland-proxy=false \\\n\
+        --group docker \\\n\
+        > /var/log/docker.log 2>&1 &\n\
+    \n\
+    # Wait for Docker to be ready\n\
+    timeout=30\n\
+    while [ $timeout -gt 0 ] && ! docker info >/dev/null 2>&1; do\n\
+        sleep 1\n\
+        timeout=$((timeout - 1))\n\
+    done\n\
+    \n\
+    if ! docker info >/dev/null 2>&1; then\n\
+        echo "Docker failed to start. Check /var/log/docker.log for details"\n\
+        exit 1\n\
+    fi\n\
+    echo "Docker daemon started successfully"\n\
+fi\n\
+\n\
+# Execute the main command\n\
+exec "$@"' > /usr/local/bin/docker-init.sh && \
+    chmod +x /usr/local/bin/docker-init.sh
+
+# Create Docker log directory with proper permissions
+RUN mkdir -p /var/log && \
+    touch /var/log/docker.log && \
+    chmod 666 /var/log/docker.log
 
 # ------------------------------------------------------------------
 # Starship - Cross-shell prompt (replacing Oh My Zsh theming)
@@ -92,6 +182,7 @@ RUN mkdir -p $USER_HOME/.config && \
 # Add Starship prompt and modern aliases to the existing Oh My Zsh setup
 # Modern aliases:
 #   • ls/ll/la - eza with colors and icons
+#   • Docker convenience aliases
 #   • Enhanced tool completions
 RUN echo 'eval "$(starship init zsh)"'                               >> $USER_HOME/.zshrc && \
     echo 'alias ls="eza --icons"'                                    >> $USER_HOME/.zshrc && \
@@ -99,6 +190,16 @@ RUN echo 'eval "$(starship init zsh)"'                               >> $USER_HO
     echo 'alias la="eza -la --icons"'                                >> $USER_HOME/.zshrc && \
     echo 'export NVM_DIR="$HOME/.nvm"'                               >> $USER_HOME/.zshrc && \
     echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'           >> $USER_HOME/.zshrc && \
+    echo ''                                                           >> $USER_HOME/.zshrc && \
+    echo '# Docker aliases'                                          >> $USER_HOME/.zshrc && \
+    echo 'alias dps="docker ps"'                                     >> $USER_HOME/.zshrc && \
+    echo 'alias dpsa="docker ps -a"'                                 >> $USER_HOME/.zshrc && \
+    echo 'alias di="docker images"'                                  >> $USER_HOME/.zshrc && \
+    echo 'alias dlog="docker logs"'                                  >> $USER_HOME/.zshrc && \
+    echo 'alias dexec="docker exec -it"'                             >> $USER_HOME/.zshrc && \
+    echo 'alias dc="docker compose"'                                 >> $USER_HOME/.zshrc && \
+    echo 'alias dcup="docker compose up"'                            >> $USER_HOME/.zshrc && \
+    echo 'alias dcdown="docker compose down"'                        >> $USER_HOME/.zshrc && \
     echo ''                                                           >> $USER_HOME/.zshrc && \
     echo '# Tool completions'                                        >> $USER_HOME/.zshrc && \
     echo 'complete -C "/usr/local/bin/aws_completer" aws'            >> $USER_HOME/.zshrc && \
@@ -149,4 +250,6 @@ RUN echo 'export NVM_DIR="$HOME/.nvm"' >> /home/vscode/.bashrc && \
 # ------------------------------------------------------------------
 WORKDIR /workspace
 
+# Set up entrypoint to start Docker daemon
+ENTRYPOINT ["/usr/local/bin/docker-init.sh"]
 CMD ["zsh"]

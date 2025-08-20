@@ -248,7 +248,7 @@ validate_image() {
     # Basic functionality test
     echo -e "${YELLOW}🧪 Running basic functionality test...${NC}"
     
-    if docker run --rm "$image_tag" bash -c 'echo "Container startup test: OK"'; then
+    if docker run --rm --privileged "$image_tag" bash -c 'echo "Container startup test: OK" && docker --version'; then
         echo -e "${GREEN}✅ Basic functionality test passed!${NC}"
     else
         echo -e "${RED}❌ Basic functionality test failed!${NC}"
