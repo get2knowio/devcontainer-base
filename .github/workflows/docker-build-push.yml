@@ -18,7 +18,6 @@ env:
 jobs:
   # Build common base image first (dependency for python/typescript)
   build-common:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -78,7 +77,7 @@ jobs:
           imageName: ${{ steps.refs.outputs.commonRepo }}
           imageTag: ${{ steps.refs.outputs.ciTag }}
           platform: linux/amd64,linux/arm64
-          push: always
+          push: ${{ github.event_name != 'pull_request' }}
           skipContainerUserIdUpdate: true
           cacheFrom: ${{ steps.refs.outputs.commonRepo }}:ci-${{ github.sha }}
         env:
@@ -92,7 +91,6 @@ jobs:
 
   # Build language-specific images in parallel (depends on common)
   build-languages:
-    if: github.event_name != 'pull_request'
     needs: [build-common]
     runs-on: ubuntu-latest
     permissions:
@@ -158,7 +156,7 @@ jobs:
           imageName: ${{ steps.refs.outputs.repo }}
           imageTag: ${{ needs.build-common.outputs.ci-tag }}
           platform: linux/amd64,linux/arm64
-          push: always
+          push: ${{ github.event_name != 'pull_request' }}
           skipContainerUserIdUpdate: true
           cacheFrom: ${{ steps.refs.outputs.repo }}:ci-${{ github.sha }}
         env:
@@ -172,7 +170,7 @@ jobs:
           # Pass the correct base image as a build arg
           BUILDKIT_INLINE_CACHE: 1
 
-  # Test built images (or build locally for PRs)
+  # Test built images
   test:
     runs-on: ubuntu-latest
     permissions:
@@ -180,7 +178,7 @@ jobs:
       packages: write
       id-token: write
     needs: [build-common, build-languages]
-    if: always() && (github.event_name == 'pull_request' || (needs.build-common.result == 'success' && needs.build-languages.result == 'success'))
+    if: always() && (needs.build-common.result == 'success' && needs.build-languages.result == 'success')
 
     steps:
       - name: Checkout repository
@@ -195,10 +193,6 @@ jobs:
         run: |
           npm install -g @devcontainers/cli
 
-      - name: Set up QEMU (for cross-arch)
-        if: github.event_name == 'pull_request'
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -210,20 +204,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run tests (build + validate both images) [PRs]
-        if: github.event_name == 'pull_request'
-        run: |
-          chmod +x ./scripts/*.sh || true
-          chmod +x ./build ./build.sh ./test || true
-          chmod +x ./scripts/test.sh
-          ./scripts/test.sh --build
-
-      - name: Run tests against CI images [push/tags]
-        if: github.event_name != 'pull_request'
+      - name: Run tests against built images
         env:
           TYPESCRIPT_IMAGE: ${{ needs.build-common.outputs.prefix }}/devcontainer-typescript-base:${{ needs.build-common.outputs.ci-tag }}
           PYTHON_IMAGE: ${{ needs.build-common.outputs.prefix }}/devcontainer-python-base:${{ needs.build-common.outputs.ci-tag }}
-          SKIP_BUILD: true
           DIND_TESTS: false
         run: |
           chmod +x ./scripts/*.sh || true

@@ -1,8 +1,25 @@
 #!/bin/bash
 
-# test.sh - Build and test DevContainer images
-# - Builds images via ./build (unless skipped)
-# - Tests language-specific images (python, typescript) in parallel
+# test.sh - Test DevContainer images
+# 
+# This script tests pre-built DevContainer images to ensure they work correctly.
+# Images must be built before running this script (either locally or pulled from registry).
+#
+# Features:
+#   • Tests language-specific images (python, typescript) in parallel
+#   • Validates basic functionality and tool availability
+#   • Optional Docker-in-Docker testing
+#   • Supports both local and remote images
+#
+# Usage:
+#   ./test.sh                                    # Test both python & typescript
+#   ./test.sh python                             # Test only python
+#   ./test.sh typescript                         # Test only typescript
+#
+# Environment Variables:
+#   TYPESCRIPT_IMAGE - Override TypeScript image name (default: devcontainer-typescript-base:latest)
+#   PYTHON_IMAGE     - Override Python image name (default: devcontainer-python-base:latest)
+#   DIND_TESTS       - Set to "false" to skip Docker-in-Docker tests (default: true)
 
 set -e
 
@@ -13,7 +30,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Image names (must match scripts/build.sh defaults)
+# Image names (must match build process)
 # Allow override via env vars for CI (e.g., ghcr.io/...:ci-<sha>)
 TYPESCRIPT_IMAGE="${TYPESCRIPT_IMAGE:-devcontainer-typescript-base:latest}"
 PYTHON_IMAGE="${PYTHON_IMAGE:-devcontainer-python-base:latest}"
@@ -50,9 +67,14 @@ build_images() {
 test_typescript_image() {
     local image_name="$1"
     echo -e "${BLUE}🧪 Testing TypeScript image: $image_name${NC}"
+    
+    # Try to pull remote image if not available locally
     if ! docker image inspect "$image_name" >/dev/null 2>&1; then
-        echo -e "${RED}❌ Image $image_name not found${NC}"
-        return 1
+        echo -e "${BLUE}🔄 Pulling remote image: $image_name${NC}"
+        if ! docker pull "$image_name" >/dev/null 2>&1; then
+            echo -e "${RED}❌ Failed to pull image $image_name${NC}"
+            return 1
+        fi
     fi
     if docker run --rm --privileged "$image_name" bash -c '
         set -e
@@ -85,9 +107,14 @@ test_typescript_image() {
 test_python_image() {
     local image_name="$1"
     echo -e "${BLUE}🧪 Testing Python image: $image_name${NC}"
+    
+    # Try to pull remote image if not available locally
     if ! docker image inspect "$image_name" >/dev/null 2>&1; then
-        echo -e "${RED}❌ Image $image_name not found${NC}"
-        return 1
+        echo -e "${BLUE}🔄 Pulling remote image: $image_name${NC}"
+        if ! docker pull "$image_name" >/dev/null 2>&1; then
+            echo -e "${RED}❌ Failed to pull image $image_name${NC}"
+            return 1
+        fi
     fi
     if docker run --rm --privileged "$image_name" bash -c '
         set -e
@@ -145,11 +172,17 @@ test_docker_in_docker() {
 
 show_usage() {
     echo -e "${BLUE}Usage:${NC}"
-    echo "  ./test.sh [both|python|typescript] [--build|--skip-build]"
+    echo "  ./test.sh [both|python|typescript]"
     echo ""
     echo -e "${BLUE}Examples:${NC}"
-    echo "  ./test.sh --build                 # Build all, then test both in parallel"
-    echo "  ./test.sh typescript --skip-build # Test only TypeScript"
+    echo "  ./test.sh                          # Test both python & typescript in parallel"
+    echo "  ./test.sh typescript               # Test only TypeScript"
+    echo "  ./test.sh python                   # Test only Python"
+    echo ""
+    echo -e "${BLUE}Environment Variables:${NC}"
+    echo "  TYPESCRIPT_IMAGE=my-ts:tag ./test.sh    # Override TypeScript image"
+    echo "  PYTHON_IMAGE=my-py:tag ./test.sh        # Override Python image" 
+    echo "  DIND_TESTS=false ./test.sh              # Skip Docker-in-Docker tests"
     echo ""
 }
 
@@ -158,31 +191,20 @@ main() {
     verify_environment
 
     local target="both"
-    local do_build="true"
     local do_dind_tests="true"
 
     # Env overrides
     if [[ -n "$TEST_IMAGE" ]]; then target="$TEST_IMAGE"; fi
-    if [[ "$SKIP_BUILD" == "true" ]]; then do_build="false"; fi
     if [[ "$DIND_TESTS" == "false" ]]; then do_dind_tests="false"; fi
 
     # Args
     while [[ $# -gt 0 ]]; do
         case "$1" in
             python|typescript|both) target="$1"; shift ;;
-            --build) do_build="true"; shift ;;
-            --skip-build) do_build="false"; shift ;;
             -h|--help|help) show_usage; exit 0 ;;
             *) echo -e "${RED}❌ Unknown arg: $1${NC}"; show_usage; exit 1 ;;
         esac
     done
-
-    # Build first (always builds common, then children)
-    if [[ "$do_build" == "true" ]]; then
-        build_images
-    else
-        echo -e "${YELLOW}⚠️  Skipping build; testing existing images${NC}"
-    fi
 
     # Select tests
     local run_py=false run_ts=false
