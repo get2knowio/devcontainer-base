@@ -143,6 +143,14 @@ jobs:
           echo "repo=$repo" >> $GITHUB_OUTPUT
           echo "full=$repo:${{ needs.build-common.outputs.ci-tag }}" >> $GITHUB_OUTPUT
 
+      - name: Update base image reference in Dockerfile
+        run: |
+          # Update the Dockerfile to reference the correct base image that was just built
+          sed -i 's|ARG BASE_IMAGE=devcontainer-base-common:latest|ARG BASE_IMAGE=${{ needs.build-common.outputs.common-image }}|' \
+            containers/${{ matrix.container }}/Dockerfile
+          echo "Updated Dockerfile:"
+          grep "ARG BASE_IMAGE" containers/${{ matrix.container }}/Dockerfile
+
       - name: Build and push multi-arch language image
         uses: devcontainers/ci@v0.3
         with:
@@ -161,6 +169,8 @@ jobs:
           CURL_MAX_TIME: 300
           # Retry settings for package downloads
           APT_ACQUIRE_RETRIES: 3
+          # Pass the correct base image as a build arg
+          BUILDKIT_INLINE_CACHE: 1
 
   # Test built images (or build locally for PRs)
   test:
