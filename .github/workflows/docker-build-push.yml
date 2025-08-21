@@ -1,4 +1,4 @@
-name: Test and Publish DevContainer Images (multi-arch)
+name: Build, Test and Publish Unified DevContainer (multi-arch)
 
 on:
   push:
@@ -16,18 +16,12 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  # Build common base image first (dependency for python/typescript)
-  build-common:
+  build-test-publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
       id-token: write
-    outputs:
-      common-image: ${{ steps.refs.outputs.commonFull }}
-      ci-tag: ${{ steps.refs.outputs.ciTag }}
-      prefix: ${{ steps.refs.outputs.prefix }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,108 +47,20 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Warm up Docker environment
-        run: |
-          # Pull base image to warm up Docker and check connectivity
-          docker pull mcr.microsoft.com/devcontainers/base:ubuntu-24.04 || echo "Base image pull failed, continuing..."
-          # Test connectivity to common endpoints
-          curl -fsSL --connect-timeout 10 --retry 3 https://packages.microsoft.com || echo "Microsoft packages connectivity test failed"
 
       - name: Compute image refs
         id: refs
         run: |
           IMAGE_REPO_PREFIX="ghcr.io/get2knowio"
-          echo "prefix=$IMAGE_REPO_PREFIX" >> $GITHUB_OUTPUT
-          echo "commonRepo=$IMAGE_REPO_PREFIX/devcontainer-base-common" >> $GITHUB_OUTPUT
-          echo "ciTag=ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
-          echo "commonFull=$IMAGE_REPO_PREFIX/devcontainer-base-common:ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          echo "repo=$IMAGE_REPO_PREFIX/devcontainer" >> $GITHUB_OUTPUT
+          echo "ci_tag=ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
 
-      - name: Build and push multi-arch common image
+      - name: Build and push multi-arch unified image
         uses: devcontainers/ci@v0.3
         with:
-          configFile: containers/common/devcontainer.json
-          imageName: ${{ steps.refs.outputs.commonRepo }}
-          imageTag: ${{ steps.refs.outputs.ciTag }}
-          platform: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' && 'always' || 'never' }}
-          skipContainerUserIdUpdate: true
-          cacheFrom: ${{ steps.refs.outputs.commonRepo }}:ci-${{ github.sha }}
-        env:
-          BUILDKIT_PROGRESS: plain
-          DOCKER_BUILDKIT: 1
-          # Network resilience for feature installation
-          CURL_CONNECT_TIMEOUT: 60
-          CURL_MAX_TIME: 300
-          # Retry settings for package downloads
-          APT_ACQUIRE_RETRIES: 3
-
-  # Build language-specific images in parallel (depends on common)
-  build-languages:
-    needs: [build-common]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    strategy:
-      matrix:
-        container: [python, typescript]
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js (for DevContainer CLI)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-
-      - name: Install DevContainer CLI
-        run: |
-          npm install -g @devcontainers/cli
-
-      - name: Set up QEMU (for cross-arch)
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Compute image refs
-        id: refs
-        run: |
-          case "${{ matrix.container }}" in
-            python) 
-              repo="${{ needs.build-common.outputs.prefix }}/devcontainer-python-base"
-              ;;
-            typescript) 
-              repo="${{ needs.build-common.outputs.prefix }}/devcontainer-typescript-base"
-              ;;
-          esac
-          echo "repo=$repo" >> $GITHUB_OUTPUT
-          echo "full=$repo:${{ needs.build-common.outputs.ci-tag }}" >> $GITHUB_OUTPUT
-
-      - name: Update base image reference in Dockerfile
-        run: |
-          # Update the Dockerfile to reference the correct base image that was just built
-          sed -i 's|ARG BASE_IMAGE=devcontainer-base-common:latest|ARG BASE_IMAGE=${{ needs.build-common.outputs.common-image }}|' \
-            containers/${{ matrix.container }}/Dockerfile
-          echo "Updated Dockerfile:"
-          grep "ARG BASE_IMAGE" containers/${{ matrix.container }}/Dockerfile
-
-      - name: Build and push multi-arch language image
-        uses: devcontainers/ci@v0.3
-        with:
-          configFile: containers/${{ matrix.container }}/devcontainer.json
+          configFile: containers/base/devcontainer.json
           imageName: ${{ steps.refs.outputs.repo }}
-          imageTag: ${{ needs.build-common.outputs.ci-tag }}
+          imageTag: ${{ steps.refs.outputs.ci_tag }}
           platform: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' && 'always' || 'never' }}
           skipContainerUserIdUpdate: true
@@ -162,93 +68,26 @@ jobs:
         env:
           BUILDKIT_PROGRESS: plain
           DOCKER_BUILDKIT: 1
-          # Network resilience for feature installation
           CURL_CONNECT_TIMEOUT: 60
           CURL_MAX_TIME: 300
-          # Retry settings for package downloads
           APT_ACQUIRE_RETRIES: 3
-          # Pass the correct base image as a build arg
-          BUILDKIT_INLINE_CACHE: 1
 
-  # Test built images
-  test:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    needs: [build-common, build-languages]
-    if: always() && (needs.build-common.result == 'success' && needs.build-languages.result == 'success')
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js (for DevContainer CLI)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-
-      - name: Install DevContainer CLI
-        run: |
-          npm install -g @devcontainers/cli
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run tests against built images
+      - name: Run tests against built image
         env:
-          TYPESCRIPT_IMAGE: ${{ needs.build-common.outputs.prefix }}/devcontainer-typescript-base:${{ needs.build-common.outputs.ci-tag }}
-          PYTHON_IMAGE: ${{ needs.build-common.outputs.prefix }}/devcontainer-python-base:${{ needs.build-common.outputs.ci-tag }}
+          IMAGE: ${{ steps.refs.outputs.repo }}:${{ steps.refs.outputs.ci_tag }}
           DIND_TESTS: false
         run: |
           chmod +x ./scripts/*.sh || true
           chmod +x ./build ./build.sh ./test || true
           chmod +x ./scripts/test.sh
           ./scripts/test.sh
-  
-  publish-common:
-    if: github.event_name != 'pull_request'
-    needs: [test]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    env:
-      IMAGE_REPO_PREFIX: ghcr.io/get2knowio
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Image repo name (common)
-        id: imagename
-        run: |
-          echo "repo=${{ env.IMAGE_REPO_PREFIX }}/devcontainer-base-common" >> $GITHUB_OUTPUT
 
       - name: Extract metadata
+        if: github.event_name != 'pull_request'
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.imagename.outputs.repo }}
+          images: ${{ steps.refs.outputs.repo }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -257,107 +96,23 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Select canonical tag
+        if: github.event_name != 'pull_request'
         id: canonical
         run: |
           tags="${{ steps.meta.outputs.tags }}"
           canonical=$(echo "$tags" | head -n1)
-          image_repo="${canonical%:*}"
-          tag_only="${canonical##*:}"
           echo "canonical_ref=$canonical" >> $GITHUB_OUTPUT
-          echo "image_repo=$image_repo" >> $GITHUB_OUTPUT
-          echo "tag_only=$tag_only" >> $GITHUB_OUTPUT
 
       - name: Promote CI image to canonical tag (manifest)
+        if: github.event_name != 'pull_request'
         run: |
-          src_tag="${{ steps.imagename.outputs.repo }}:ci-${{ github.sha }}"
+          src_tag='${{ steps.refs.outputs.repo }}:ci-${{ github.sha }}'
           dst_tag='${{ steps.canonical.outputs.canonical_ref }}'
           echo "Promoting $src_tag -> $dst_tag"
           docker buildx imagetools create --tag "$dst_tag" "$src_tag"
 
       - name: Retag and publish additional tags as manifest list
-        if: ${{ steps.meta.outputs.tags != '' }}
-        run: |
-          canonical='${{ steps.canonical.outputs.canonical_ref }}'
-          echo "Canonical: $canonical"
-          echo "All tags:\n${{ steps.meta.outputs.tags }}"
-          while IFS= read -r tag; do
-            [ -z "$tag" ] && continue
-            if [ "$tag" = "$canonical" ]; then
-              echo "Skip canonical tag $tag"
-              continue
-            fi
-            echo "Creating manifest tag: $tag -> $canonical"
-            docker buildx imagetools create --tag "$tag" "$canonical"
-          done <<< "${{ steps.meta.outputs.tags }}"
-
-  publish-children:
-    if: github.event_name != 'pull_request'
-    needs: [publish-common]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    strategy:
-      matrix:
-        container: [python, typescript]
-    env:
-      IMAGE_REPO_PREFIX: ghcr.io/get2knowio
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Image repo name
-        id: imagename
-        run: |
-          case "${{ matrix.container }}" in
-            python) repo="${{ env.IMAGE_REPO_PREFIX }}/devcontainer-python-base" ;;
-            typescript) repo="${{ env.IMAGE_REPO_PREFIX }}/devcontainer-typescript-base" ;;
-          esac
-          echo "repo=$repo" >> $GITHUB_OUTPUT
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ steps.imagename.outputs.repo }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Select canonical tag
-        id: canonical
-        run: |
-          tags="${{ steps.meta.outputs.tags }}"
-          canonical=$(echo "$tags" | head -n1)
-          image_repo="${canonical%:*}"
-          tag_only="${canonical##*:}"
-          echo "canonical_ref=$canonical" >> $GITHUB_OUTPUT
-          echo "image_repo=$image_repo" >> $GITHUB_OUTPUT
-          echo "tag_only=$tag_only" >> $GITHUB_OUTPUT
-
-      - name: Promote CI image to canonical tag (manifest)
-        run: |
-          src_tag="${{ steps.imagename.outputs.repo }}:ci-${{ github.sha }}"
-          dst_tag='${{ steps.canonical.outputs.canonical_ref }}'
-          echo "Promoting $src_tag -> $dst_tag"
-          docker buildx imagetools create --tag "$dst_tag" "$src_tag"
-
-      - name: Retag and publish additional tags as manifest list
-        if: ${{ steps.meta.outputs.tags != '' }}
+        if: github.event_name != 'pull_request' && steps.meta.outputs.tags != ''
         run: |
           canonical='${{ steps.canonical.outputs.canonical_ref }}'
           echo "Canonical: $canonical"

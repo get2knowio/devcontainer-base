@@ -1,24 +1,16 @@
 ########################################################################
-#  Development Container - Common Base Image
-#  
-#  A comprehensive development environment built on Microsoft's DevContainer
-#  base Ubuntu image with modern development tools and configurations.
-#  This base image contains all common functionality shared across language-
-#  specific containers.
-#  
-#  🐚 Shell & Prompt:
-#    • Zsh with Oh My Zsh (from base image)
-#    • Starship - minimal, blazing-fast, infinitely customizable prompt
-#    • Enhanced completions for all installed tools
-#  
-#  🐳 Docker Engine:
-#    • Full Docker-in-Docker support with Docker Engine
-#    • Docker Compose v2 for multi-container applications
-#    • Docker Buildx for multi-platform image builds
-#    • Automatic daemon startup and container management
-#  
-#  🌐 Node.js Ecosystem:
-#    • Node.js LTS via nvm (Node Version Manager)
+#  DEPRECATED FILE
+#
+#  This repository now uses a SINGLE unified container located at:
+#    containers/base/
+#
+#  The previous multi-container layout (common/python/typescript) has been
+#  removed. This file remains only to avoid breaking existing references.
+#  It will be deleted in a future cleanup.
+#
+#  Do NOT modify; update the unified Dockerfile instead:
+#    containers/base/Dockerfile
+########################################################################
 #    • Gemini CLI - Google's generative AI command line tool
 #    • Claude Code - Anthropic's AI assistant for developers
 #  

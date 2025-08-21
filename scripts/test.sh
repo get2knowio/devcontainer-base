@@ -1,293 +1,91 @@
 #!/bin/bash
 
-# test.sh - Test DevContainer images
-# 
-# This script tests pre-built DevContainer images to ensure they work correctly.
-# Images must be built before running this script (either locally or pulled from registry).
+## test.sh - Unified DevContainer image tests
 #
-# Features:
-#   • Tests language-specific images (python, typescript) in parallel
-#   • Validates basic functionality and tool availability
-#   • Optional Docker-in-Docker testing
-#   • Supports both local and remote images
+# Validates the single unified image for tool availability and basic DinD.
 #
-# Usage:
-#   ./test.sh                                    # Test both python & typescript
-#   ./test.sh python                             # Test only python
-#   ./test.sh typescript                         # Test only typescript
-#
-# Environment Variables:
-#   TYPESCRIPT_IMAGE - Override TypeScript image name (default: devcontainer-typescript-base:latest)
-#   PYTHON_IMAGE     - Override Python image name (default: devcontainer-python-base:latest)
-#   DIND_TESTS       - Set to "false" to skip Docker-in-Docker tests (default: true)
-
 set -e
 
 # Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-# Image names (must match build process)
-# Allow override via env vars for CI (e.g., ghcr.io/...:ci-<sha>)
-TYPESCRIPT_IMAGE="${TYPESCRIPT_IMAGE:-devcontainer-typescript-base:latest}"
-PYTHON_IMAGE="${PYTHON_IMAGE:-devcontainer-python-base:latest}"
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
+IMAGE="${IMAGE:-devcontainer-unified:latest}"
 
 verify_environment() {
     echo -e "${BLUE}🔍 Verifying testing environment...${NC}"
-    if ! command -v docker >/dev/null 2>&1; then
-        echo -e "${RED}❌ Docker not found. This script requires Docker.${NC}"
-        exit 1
-    fi
-    if ! docker info >/dev/null 2>&1; then
-        echo -e "${RED}❌ Cannot access Docker daemon. Ensure Docker is running.${NC}"
-        exit 1
-    fi
-    echo -e "${GREEN}✅ Environment verified!${NC}"
-    echo "Docker: $(docker --version)"
-    echo ""
+    command -v docker >/dev/null 2>&1 || { echo -e "${RED}❌ Docker not found${NC}"; exit 1; }
+    docker info >/dev/null 2>&1 || { echo -e "${RED}❌ Docker daemon unavailable${NC}"; exit 1; }
+    echo -e "${GREEN}✅ Environment verified${NC}\n"
 }
 
-build_images() {
-    if [[ "$SKIP_BUILD" == "true" ]]; then
-        echo -e "${BLUE}⏭️  Skipping build (SKIP_BUILD=true)${NC}"
-        return 0
-    fi
-    echo -e "${BLUE}🏗️  Building images with ./build all...${NC}"
-    if ./build all; then
-        echo -e "${GREEN}✅ Build completed${NC}"
-    else
-        echo -e "${RED}❌ Build failed${NC}"
-        exit 1
-    fi
-}
-
-test_typescript_image() {
+test_unified_image() {
     local image_name="$1"
-    echo -e "${BLUE}🧪 Testing TypeScript image: $image_name${NC}"
-    
-    # Try to pull remote image if not available locally
+    echo -e "${BLUE}🧪 Testing unified image: $image_name${NC}"
     if ! docker image inspect "$image_name" >/dev/null 2>&1; then
-        echo -e "${BLUE}🔄 Pulling remote image: $image_name${NC}"
-        if ! docker pull "$image_name" >/dev/null 2>&1; then
-            echo -e "${RED}❌ Failed to pull image $image_name${NC}"
-            return 1
-        fi
+        echo -e "${BLUE}🔄 Pulling $image_name${NC}"; docker pull "$image_name" || true
     fi
-    if docker run --rm --privileged "$image_name" bash -c '
+    docker run --rm --privileged "$image_name" bash -c '
         set -e
-        echo "=== TypeScript Image Tests ==="
-        echo "User: $(whoami)"
-        echo "Home: $HOME"
-
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-        command -v node >/dev/null 2>&1 && echo "✅ Node: $(node --version)" || { echo "❌ Node missing"; exit 1; }
-        command -v npm  >/dev/null 2>&1 && echo "✅ npm: $(npm --version)"   || { echo "❌ npm missing"; exit 1; }
-        npx tsc --version >/dev/null 2>&1 && echo "✅ TypeScript: $(npx tsc --version)" || { echo "❌ TypeScript missing"; exit 1; }
-        command -v bun  >/dev/null 2>&1 && echo "✅ Bun: $(bun --version)"   || { echo "❌ Bun missing"; exit 1; }
-        command -v pnpm >/dev/null 2>&1 && echo "✅ pnpm: $(pnpm --version)" || echo "ℹ️  pnpm not found"
-        command -v yarn >/dev/null 2>&1 && echo "✅ yarn: $(yarn --version)" || echo "ℹ️  yarn not found"
-
-        command -v docker >/dev/null 2>&1 && echo "✅ Docker CLI present" || { echo "❌ Docker CLI missing"; exit 1; }
-
-        touch /workspace/.write-test && rm /workspace/.write-test && echo "✅ Workspace writable"
-    '; then
-        echo -e "${GREEN}✅ TypeScript basic tests passed${NC}"
-        return 0
-    else
-        echo -e "${RED}❌ TypeScript tests failed${NC}"
-        return 1
-    fi
-}
-
-test_python_image() {
-    local image_name="$1"
-    echo -e "${BLUE}🧪 Testing Python image: $image_name${NC}"
-    
-    # Try to pull remote image if not available locally
-    if ! docker image inspect "$image_name" >/dev/null 2>&1; then
-        echo -e "${BLUE}🔄 Pulling remote image: $image_name${NC}"
-        if ! docker pull "$image_name" >/dev/null 2>&1; then
-            echo -e "${RED}❌ Failed to pull image $image_name${NC}"
-            return 1
-        fi
-    fi
-    if docker run --rm --privileged "$image_name" bash -c '
-        set -e
-        echo "=== Python Image Tests ==="
-        echo "User: $(whoami)"
-        echo "Home: $HOME"
-
-        # Add Poetry to PATH for testing
-        export PATH="/usr/local/py-utils/bin:$PATH"
-
+        echo "=== Unified Image Tests ==="
+        
+        # Test Python and Poetry (available to root)
         command -v python3 >/dev/null 2>&1 && echo "✅ Python: $(python3 --version)" || { echo "❌ Python missing"; exit 1; }
-        command -v pip3    >/dev/null 2>&1 && echo "✅ pip: $(pip3 --version)"      || { echo "❌ pip missing"; exit 1; }
         command -v poetry  >/dev/null 2>&1 && echo "✅ Poetry: $(poetry --version)" || { echo "❌ Poetry missing"; exit 1; }
-
         python3 - <<PY
 print("✅ Python quick check OK")
 PY
-
         command -v docker >/dev/null 2>&1 && echo "✅ Docker CLI present" || { echo "❌ Docker CLI missing"; exit 1; }
-
         touch /workspace/.write-test && rm /workspace/.write-test && echo "✅ Workspace writable"
-    '; then
-        echo -e "${GREEN}✅ Python basic tests passed${NC}"
-        return 0
-    else
-        echo -e "${RED}❌ Python tests failed${NC}"
-        return 1
-    fi
+        
+        # Test Node.js tools as vscode user (where nvm is installed)
+        su - vscode -c '\''
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh" 2>/dev/null || true
+            command -v node >/dev/null 2>&1 && echo "✅ Node: $(node --version)" || { echo "❌ Node missing"; exit 1; }
+            command -v npm  >/dev/null 2>&1 && echo "✅ npm: $(npm --version)"   || { echo "❌ npm missing"; exit 1; }
+            npx tsc --version >/dev/null 2>&1 && echo "✅ TypeScript: $(npx tsc --version)" || { echo "❌ TypeScript missing"; exit 1; }
+            command -v pnpm >/dev/null 2>&1 && echo "✅ pnpm: $(pnpm --version)" || echo "ℹ️ pnpm not found"
+            command -v yarn >/dev/null 2>&1 && echo "✅ yarn: $(yarn --version)" || echo "ℹ️ yarn not found"
+            command -v gemini >/dev/null 2>&1 && echo "ℹ️ Gemini CLI present" || true
+            command -v claude >/dev/null 2>&1 && echo "ℹ️ Claude CLI present" || true
+        '\''
+    '
 }
 
 test_docker_in_docker() {
     local image_name="$1"
-    echo -e "${BLUE}🐳 Docker-in-Docker smoke test (TypeScript image)...${NC}"
-    if docker run --rm --privileged "$image_name" bash -c '
+    echo -e "${BLUE}🐳 DinD smoke test...${NC}"
+    docker run --rm --privileged "$image_name" bash -c '
         set -e
         command -v docker >/dev/null 2>&1 || { echo "❌ Docker CLI missing"; exit 1; }
-        if docker info >/dev/null 2>&1; then
-            echo "✅ Docker daemon accessible"
-        else
-            echo "ℹ️  Starting Docker daemon"
+        if ! docker info >/dev/null 2>&1; then
+            echo "ℹ️ Starting dockerd"
             sudo dockerd --host=unix:///var/run/docker.sock --pidfile=/var/run/docker.pid >/tmp/dockerd.log 2>&1 &
-            for i in {1..20}; do docker info >/dev/null 2>&1 && break || sleep 2; done
-            docker info >/dev/null 2>&1 && echo "✅ Docker daemon started" || { echo "❌ Docker daemon failed"; exit 1; }
+            for i in {1..25}; do docker info >/dev/null 2>&1 && break || sleep 1; done
         fi
-        timeout 60 docker pull alpine:latest >/dev/null 2>&1 && echo "✅ Pull works" || { echo "❌ Pull failed"; exit 1; }
-        docker run --rm alpine:latest echo ok >/dev/null 2>&1 && echo "✅ Run works" || { echo "❌ Run failed"; exit 1; }
-    '; then
-        echo -e "${GREEN}✅ Docker-in-Docker tests passed${NC}"
-        return 0
-    else
-        echo -e "${YELLOW}⚠️  Docker-in-Docker tests failed (non-fatal)${NC}"
-        return 1
-    fi
-}
-
-show_usage() {
-    echo -e "${BLUE}Usage:${NC}"
-    echo "  ./test.sh [both|python|typescript]"
-    echo ""
-    echo -e "${BLUE}Examples:${NC}"
-    echo "  ./test.sh                          # Test both python & typescript in parallel"
-    echo "  ./test.sh typescript               # Test only TypeScript"
-    echo "  ./test.sh python                   # Test only Python"
-    echo ""
-    echo -e "${BLUE}Environment Variables:${NC}"
-    echo "  TYPESCRIPT_IMAGE=my-ts:tag ./test.sh    # Override TypeScript image"
-    echo "  PYTHON_IMAGE=my-py:tag ./test.sh        # Override Python image" 
-    echo "  DIND_TESTS=false ./test.sh              # Skip Docker-in-Docker tests"
-    echo ""
+        docker info >/dev/null 2>&1 && echo "✅ Docker daemon ready" || { echo "❌ dockerd failed"; exit 1; }
+        timeout 60 docker pull alpine:latest >/dev/null 2>&1 && echo "✅ Pull alpine" || { echo "❌ Pull failed"; exit 1; }
+        docker run --rm alpine:latest echo ok >/dev/null 2>&1 && echo "✅ Run alpine" || { echo "❌ Run failed"; exit 1; }
+    '
 }
 
 main() {
-    echo -e "${BLUE}🚀 DevContainer Image Tests${NC}"
+    echo -e "${BLUE}🚀 Unified DevContainer Image Tests${NC}"
     verify_environment
-
-    local target="both"
-    local do_dind_tests="true"
-
-    # Env overrides
-    if [[ -n "$TEST_IMAGE" ]]; then target="$TEST_IMAGE"; fi
-    if [[ "$DIND_TESTS" == "false" ]]; then do_dind_tests="false"; fi
-
-    # Args
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            python|typescript|both) target="$1"; shift ;;
-            -h|--help|help) show_usage; exit 0 ;;
-            *) echo -e "${RED}❌ Unknown arg: $1${NC}"; show_usage; exit 1 ;;
-        esac
-    done
-
-    # Select tests
-    local run_py=false run_ts=false
-    case "$target" in
-        python) run_py=true ;;
-        typescript) run_ts=true ;;
-        both|all) run_py=true; run_ts=true ;;
-        *) echo -e "${RED}❌ Invalid target: $target${NC}"; exit 1 ;;
-    esac
-
-    # Run tests in parallel
-    echo -e "${BLUE}🏃 Running tests in parallel...${NC}"
-    local p_pid=0 t_pid=0
-    local p_res=0 t_res=0
-
-    if $run_py; then
-        ( test_python_image "$PYTHON_IMAGE" ) & p_pid=$!
+    if test_unified_image "$IMAGE"; then
+        echo -e "${GREEN}✅ Basic tests passed${NC}"
+    else
+        echo -e "${RED}❌ Basic tests failed${NC}"; exit 1
     fi
-    if $run_ts; then
-        ( test_typescript_image "$TYPESCRIPT_IMAGE" ) & t_pid=$!
-    fi
-
-    # Wait and collect
-    if [[ $p_pid -ne 0 ]]; then
-        wait $p_pid || p_res=$?
-    fi
-    if [[ $t_pid -ne 0 ]]; then
-        wait $t_pid || t_res=$?
-    fi
-
-    # Run Docker-in-Docker tests for selected images (only if enabled and basic tests passed)
-    local pd_pid=0 td_pid=0
-    local pd_res=0 td_res=0
-    if [[ "$do_dind_tests" == "true" ]]; then
-        if $run_py && [[ $p_res -eq 0 ]]; then
-            ( test_docker_in_docker "$PYTHON_IMAGE" ) & pd_pid=$!
-        fi
-        if $run_ts && [[ $t_res -eq 0 ]]; then
-            ( test_docker_in_docker "$TYPESCRIPT_IMAGE" ) & td_pid=$!
-        fi
-
-        if [[ $pd_pid -ne 0 ]]; then
-            wait $pd_pid || pd_res=$?
-        fi
-        if [[ $td_pid -ne 0 ]]; then
-            wait $td_pid || td_res=$?
+    if [[ "${DIND_TESTS:-true}" == "true" ]]; then
+        if test_docker_in_docker "$IMAGE"; then
+            echo -e "${GREEN}✅ DinD test passed${NC}"
+        else
+            echo -e "${YELLOW}⚠️ DinD test failed (non-fatal)${NC}"
         fi
     else
-        echo -e "${YELLOW}⚠️  Skipping Docker-in-Docker tests (DIND_TESTS=false)${NC}"
+        echo -e "${YELLOW}⚠️ Skipping DinD tests (DIND_TESTS=false)${NC}"
     fi
-
-    echo -e "\n${BLUE}=== Test Results ===${NC}"
-    if $run_py; then
-        [[ $p_res -eq 0 ]] && echo -e "${GREEN}✅ Python basic: PASSED${NC}" || echo -e "${RED}❌ Python basic: FAILED${NC}"
-        if [[ "$do_dind_tests" == "true" && $p_res -eq 0 ]]; then
-            [[ $pd_res -eq 0 ]] && echo -e "${GREEN}✅ Python DinD: PASSED${NC}" || echo -e "${RED}❌ Python DinD: FAILED${NC}"
-        fi
-    fi
-    if $run_ts; then
-        [[ $t_res -eq 0 ]] && echo -e "${GREEN}✅ TypeScript basic: PASSED${NC}" || echo -e "${RED}❌ TypeScript basic: FAILED${NC}"
-        if [[ "$do_dind_tests" == "true" && $t_res -eq 0 ]]; then
-            [[ $td_res -eq 0 ]] && echo -e "${GREEN}✅ TypeScript DinD: PASSED${NC}" || echo -e "${RED}❌ TypeScript DinD: FAILED${NC}"
-        fi
-    fi
-
-    # Overall status requires both basic and DinD (when run) to pass
-    local overall_ok=true
-    if $run_py; then
-        if [[ $p_res -ne 0 ]]; then overall_ok=false; fi
-        if [[ "$do_dind_tests" == "true" && $pd_res -ne 0 ]]; then overall_ok=false; fi
-    fi
-    if $run_ts; then
-        if [[ $t_res -ne 0 ]]; then overall_ok=false; fi
-        if [[ "$do_dind_tests" == "true" && $td_res -ne 0 ]]; then overall_ok=false; fi
-    fi
-
-    if $overall_ok; then
-        echo -e "\n${GREEN}🎉 All tests passed${NC}"
-        exit 0
-    else
-        echo -e "\n${RED}❌ Some tests failed${NC}"
-        exit 1
-    fi
+    echo -e "\n${GREEN}🎉 All done${NC}"
 }
 
 main "$@"

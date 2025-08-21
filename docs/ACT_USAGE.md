@@ -19,16 +19,16 @@ This will download and install act to `/usr/local/bin/act`.
 act -l
 ```
 
-### Run Specific Jobs
+### Run Specific Job
 ```bash
-# Run the build-common job (builds the base DevContainer image)
-act -j build-common
+# Run the unified build/test/publish job
+act -j build-test-publish
 
-# Run with environment variables
-act -j build-common --env CI=true
+# With environment variables
+act -j build-test-publish --env CI=true
 
-# Run with custom secrets (create a .secrets file first)
-act -j build-common --secret-file .secrets
+# With secrets (create a .secrets file first)
+act -j build-test-publish --secret-file .secrets
 ```
 
 ### Test Full Workflow
@@ -43,10 +43,10 @@ act -n push
 ### Debug Mode
 ```bash
 # Run with verbose output for debugging
-act -v -j build-common
+act -v -j build-test-publish
 
 # Reuse containers to maintain state between runs
-act -r -j build-common
+act -r -j build-test-publish
 ```
 
 ## Configuration
@@ -72,8 +72,8 @@ GITHUB_TOKEN=your_github_token_here
 ## Useful Commands
 
 ```bash
-# Test just the DevContainer build step to debug SSL issues
-act -j build-common --env CI=true
+# Trigger only the unified job in debug mode
+act -v -j build-test-publish --env CI=true
 
 # See what containers are running
 docker ps

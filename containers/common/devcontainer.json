@@ -1,23 +1,14 @@
 {
-  "name": "DevContainer Base Common Image",
+  "name": "DEPRECATED - use containers/base/devcontainer.json",
   "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".",
-    "args": {
-      "BUILDKIT_INLINE_CACHE": "1"
-    }
+    "dockerfile": "Dockerfile"
   },
-  "features": {
-    "ghcr.io/devcontainers/features/aws-cli:1": {
-      "version": "latest"
+  "postCreateCommand": "echo 'Deprecated. Use containers/base/devcontainer.json'",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "deprecated.notice": true
+      }
     }
-  },
-  "runArgs": [
-    "--privileged"
-  ],
-  "overrideCommand": false,
-  "init": true,
-  "privileged": true,
-  "remoteUser": "vscode",
-  "workspaceFolder": "/workspace"
+  }
 }

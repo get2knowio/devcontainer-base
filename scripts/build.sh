@@ -13,19 +13,15 @@
 #   • Produces a tagged Docker image suitable for publishing
 #   • Supports multi-architecture builds
 #   • Validates the built image
-#   • Supports multiple container types (python, typescript)
+#   • Single unified polyglot container (Python + TypeScript)
 #
 # Usage:
-#   ./build.sh <container-type>                         # Build with default tag
-#   ./build.sh <container-type> my-custom-tag           # Build with custom tag
-#   ./build.sh typescript my-registry.com/my-image:v1.0 # Build with full registry path
-#   ./build.sh all                                      # Build common, then python & typescript in parallel
+#   ./build.sh                                         # Build unified image with default tag
+#   ./build.sh my-custom-tag                           # Build with custom tag
+#   ./build.sh ghcr.io/owner/repo:tag                  # Build with full registry path
 #
 # Container Types:
-#   common     - Common base development container
-#   python     - Python development container
-#   typescript - TypeScript/Node.js development container
-#   all        - Build common, then python & typescript (parallel)
+#   unified    - Unified Python + TypeScript container (default/only)
 #
 # Environment Variables:
 #   IMAGE_TAG - Override the default image tag
@@ -44,11 +40,11 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Default values
-DEFAULT_IMAGE_TAG_PREFIX="devcontainer"
+DEFAULT_IMAGE_TAG_PREFIX="devcontainer-unified"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEMP_DIR=""
-CONTAINER_TYPE=""
-SUPPORTED_CONTAINERS=("common" "python" "typescript")
+CONTAINER_TYPE="unified"
+SUPPORTED_CONTAINERS=("unified")
 
 # Function to display script header
 show_header() {
@@ -60,16 +56,12 @@ show_header() {
 # Function to display usage information
 show_usage() {
     echo -e "${BLUE}Usage:${NC}"
-    echo "  ./build.sh <container-type>                         # Build with default tag"
-    echo "  ./build.sh <container-type> my-custom-tag           # Build with custom tag"
-    echo "  ./build.sh typescript my-registry.com/my-image:v1.0 # Build with full registry path"
-    echo "  ./build.sh all                                      # Build common, then python & typescript in parallel"
+    echo "  ./build.sh                                         # Build unified image"
+    echo "  ./build.sh my-custom-tag                           # Build with custom tag"
+    echo "  ./build.sh ghcr.io/owner/repo:tag                  # Build with full registry path"
     echo ""
     echo -e "${BLUE}Container Types:${NC}"
-    echo "  common     - Common base development container"
-    echo "  python     - Python development container"
-    echo "  typescript - TypeScript/Node.js development container"
-    echo "  all        - Build common, then python & typescript (parallel)"
+    echo "  unified    - Unified Python + TypeScript container"
     echo ""
     echo -e "${BLUE}Environment Variables:${NC}"
     echo "  IMAGE_TAG=my-tag ./build.sh <type>          # Override the default image tag"
@@ -78,11 +70,11 @@ show_usage() {
     echo "  PUSH=true ./build.sh <type>                 # Push image after building"
     echo ""
     echo -e "${BLUE}Examples:${NC}"
-    echo "  ./build.sh typescript                       # Basic TypeScript build"
-    echo "  ./build.sh python                           # Basic Python build"
-    echo "  IMAGE_TAG=my-app:v1.0 ./build.sh python    # Custom tag via env var"
-    echo "  PLATFORM=linux/arm64 ./build.sh typescript # ARM64 build"
-    echo "  NO_CACHE=true PUSH=true ./build.sh python  # No cache, auto-push"
+    echo "  ./build.sh                                  # Basic build"
+    echo "  ./build.sh ghcr.io/org/img:dev              # Custom tag"
+    echo "  IMAGE_TAG=my-app:v1.0 ./build.sh            # Custom tag via env var"
+    echo "  PLATFORM=linux/arm64 ./build.sh             # ARM64 build"
+    echo "  NO_CACHE=true PUSH=true ./build.sh          # No cache, auto-push"
 }
 
 # Function to verify prerequisites
@@ -111,7 +103,7 @@ verify_prerequisites() {
     fi
     
     # Check required files exist for the specified container type
-    local container_dir="$SCRIPT_DIR/containers/$CONTAINER_TYPE"
+    local container_dir="$SCRIPT_DIR/containers/base"
     if [[ ! -d "$container_dir" ]]; then
         echo -e "${RED}❌ Container directory not found: $container_dir${NC}"
         exit 1
@@ -144,12 +136,7 @@ determine_image_tag() {
     elif [[ -n "$IMAGE_TAG" ]]; then
         echo "$IMAGE_TAG"
     else
-        if [[ "$CONTAINER_TYPE" == "common" ]]; then
-            # Match child Dockerfiles: FROM devcontainer-base-common:latest
-            echo "${DEFAULT_IMAGE_TAG_PREFIX}-base-common:latest"
-        else
-            echo "${DEFAULT_IMAGE_TAG_PREFIX}-${CONTAINER_TYPE}-base:latest"
-        fi
+    echo "${DEFAULT_IMAGE_TAG_PREFIX}:latest"
     fi
 }
 
@@ -164,7 +151,7 @@ create_temp_workspace() {
     mkdir -p "$TEMP_DIR/.devcontainer"
     
     # Use the container's devcontainer.json directly (inheritance handled by Dockerfiles)
-    local container_dir="$SCRIPT_DIR/containers/$CONTAINER_TYPE"
+    local container_dir="$SCRIPT_DIR/containers/base"
     echo -e "${BLUE}📄 Using $CONTAINER_TYPE devcontainer.json directly...${NC}"
     cp "$container_dir/devcontainer.json" "$TEMP_DIR/.devcontainer/devcontainer.json"
     
@@ -327,7 +314,7 @@ build_single() {
     local image_tag
     image_tag=$(determine_image_tag "$custom_tag")
 
-    echo -e "${CYAN}Building $CONTAINER_TYPE container with tag: $image_tag${NC}"
+    echo -e "${CYAN}Building unified container with tag: $image_tag${NC}"
     echo ""
 
     create_temp_workspace
@@ -368,67 +355,22 @@ main() {
     fi
     
         # Parse arguments (default to building all if omitted)
-        local target
         local custom_tag
         if [[ -z "$1" ]]; then
-            target="all"
             custom_tag=""
-            echo -e "${YELLOW}\u2139\ufe0f  No container type provided; defaulting to 'all'${NC}"
         else
-            target="$1"
-            custom_tag="$2"
+            custom_tag="$1"
         fi
 
     # Optional dry run: verify prerequisites for all
     if [[ "$custom_tag" == "--dry-run" ]]; then
-        echo -e "${YELLOW}🧪 Dry run mode - verifying prerequisites for common, python, typescript${NC}"
-        for t in "common" "python" "typescript"; do
-            CONTAINER_TYPE="$t"
-            verify_prerequisites
-        done
+        echo -e "${YELLOW}🧪 Dry run mode - verifying prerequisites for unified${NC}"
+        verify_prerequisites
         echo -e "${GREEN}✅ Dry run completed successfully!${NC}"
         exit 0
     fi
 
-    case "$target" in
-        common)
-            build_single common "$custom_tag" || exit 1
-            ;;
-        python)
-            echo -e "${YELLOW}🔁 Building common base first...${NC}"
-            build_single common "" || exit 1
-            build_single python "$custom_tag" || exit 1
-            ;;
-        typescript)
-            echo -e "${YELLOW}🔁 Building common base first...${NC}"
-            build_single common "" || exit 1
-            build_single typescript "$custom_tag" || exit 1
-            ;;
-        all|both)
-            echo -e "${YELLOW}🔁 Building common base first, then python & typescript in parallel...${NC}"
-            build_single common "" || exit 1
-
-            (
-                trap cleanup EXIT
-                build_single python ""
-            ) & pid_python=$!
-
-            (
-                trap cleanup EXIT
-                build_single typescript ""
-            ) & pid_typescript=$!
-
-            wait $pid_python || { echo -e "${RED}❌ Python build failed${NC}"; exit 1; }
-            wait $pid_typescript || { echo -e "${RED}❌ TypeScript build failed${NC}"; exit 1; }
-
-            echo -e "${GREEN}✅ All builds completed successfully${NC}"
-            ;;
-        *)
-            echo -e "${RED}❌ Unsupported container type: $target${NC}"
-            echo "Supported: common, python, typescript, all"
-            exit 1
-            ;;
-    esac
+    build_single unified "$custom_tag" || exit 1
 }
 
 # Run main function with all arguments

@@ -1,0 +1,29 @@
+{
+  "name": "Unified DevContainer (Python + TypeScript)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "args": {
+      "BUILDKIT_INLINE_CACHE": "1"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/aws-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": true,
+      "azureDnsAutoDetection": true,
+      "installDockerBuildx": true,
+      "version": "latest",
+      "dockerDashComposeVersion": "v2"
+    }
+  },
+  "runArgs": ["--privileged"],
+  "overrideCommand": false,
+  "init": true,
+  "privileged": true,
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspace",
+  "postCreateCommand": "poetry --version && node --version && npm --version && (tsc --version || npx tsc --version)"
+}
