@@ -77,6 +77,23 @@ jobs:
           IMAGE: ${{ steps.refs.outputs.repo }}:${{ steps.refs.outputs.ci_tag }}
           DIND_TESTS: false
         run: |
+          # Wait for image to be available and pull it explicitly  
+          echo "Waiting for image to be available in registry..."
+          for i in {1..30}; do
+            if docker pull $IMAGE --platform=linux/amd64; then
+              echo "✅ Image pulled successfully"
+              break
+            fi
+            echo "⏳ Attempt $i/30 failed, waiting 10 seconds..."
+            sleep 10
+          done
+          
+          # Verify image exists locally
+          docker image inspect $IMAGE >/dev/null 2>&1 || { 
+            echo "❌ Image not available locally after pull attempts"
+            exit 1
+          }
+          
           chmod +x ./scripts/*.sh || true
           chmod +x ./build ./build.sh ./test || true
           chmod +x ./scripts/test.sh

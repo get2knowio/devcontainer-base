@@ -8,7 +8,7 @@ set -e
 
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
-IMAGE="${IMAGE:-devcontainer-unified:latest}"
+IMAGE="${IMAGE:-ghcr.io/get2knowio/devcontainer:latest}"
 
 verify_environment() {
     echo -e "${BLUE}🔍 Verifying testing environment...${NC}"
