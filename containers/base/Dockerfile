@@ -14,7 +14,7 @@
 #    • AI CLIs: @google/gemini-cli, @anthropic-ai/claude-code
 #    • TS tooling: typescript, ts-node, tsx, @types/node, nodemon, concurrently,
 #                  vite, esbuild, prettier, eslint, @biomejs/biome, tsc-watch,
-#                  pnpm, yarn
+#                  pnpm, yarn, bun
 #    • Poetry installed via Dockerfile (NOT a feature)
 #
 #  Workspace: /workspace
@@ -51,27 +51,6 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
     apt-get install -y /tmp/eza.deb || echo 'eza install failed; continuing' && \
     rm -f /tmp/eza.deb && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# ------------------------------------------------------------------
-# Docker Engine installation (DinD setup) - COMMENTED OUT - now using devcontainer feature
-# ------------------------------------------------------------------
-# RUN set -e; \
-#     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
-#     . /etc/os-release; \
-#     if [ "$ID" = "debian" ]; then DOCKER_DISTRO="debian"; else DOCKER_DISTRO="ubuntu"; fi; \
-#     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/${DOCKER_DISTRO} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && \
-#     apt-get update && \
-#     apt-get install -y --no-install-recommends \
-#         docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && \
-#     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-#     groupadd -f docker && usermod -aG docker ${USERNAME}
-
-# Docker daemon configuration and helper entrypoint - COMMENTED OUT - now using devcontainer feature
-# RUN mkdir -p /etc/docker && \
-#     printf '{\n  "features": { "buildkit": true },\n  "default-address-pools": [\n    { "base": "172.17.0.0/16", "size": 24 },\n    { "base": "172.18.0.0/16", "size": 24 }\n  ],\n  "storage-driver": "vfs",\n  "log-driver": "json-file",\n  "log-opts": {"max-size": "10m", "max-file": "3"}\n}\n' > /etc/docker/daemon.json && \
-#     printf '#!/bin/bash\nset -e\nLOG=/var/log/docker.log\n# Expose nvm-installed node in non-login shells\nexport NVM_DIR="/home/vscode/.nvm"\nif [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh" >/dev/null 2>&1; fi\nif [ -d "$NVM_DIR/versions/node" ]; then export PATH="$NVM_DIR/versions/node/$(ls -1 $NVM_DIR/versions/node | grep -v current | head -n1)/bin:$PATH"; fi\nmkdir -p /var/run || true\nif [ "$SKIP_DOCKER_INIT" = "true" ]; then\n  echo "[docker-init] SKIP_DOCKER_INIT=true; skipping dockerd"\nelse\n  if ! docker info >/dev/null 2>&1; then\n    echo "[docker-init] Starting dockerd..."\n    sudo pkill dockerd || true\n    (sudo dockerd --host=unix:///var/run/docker.sock --group=docker > "$LOG" 2>&1 &)\n    for i in $(seq 1 25); do docker info >/dev/null 2>&1 && break || sleep 1; done\n    if ! docker info >/dev/null 2>&1; then\n      echo "[docker-init] WARNING: dockerd failed to start (continuing without DinD)"\n    fi\n  fi\nfi\nexec "$@"\n' > /usr/local/bin/docker-init.sh && \
-#     chmod +x /usr/local/bin/docker-init.sh && \
-#     mkdir -p /var/log && touch /var/log/docker.log && chmod 666 /var/log/docker.log
 
 # ------------------------------------------------------------------
 # Starship prompt and zsh enhancements
@@ -113,6 +92,18 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/instal
     npm install -g pnpm yarn && \
     npm install -g typescript ts-node tsx @types/node nodemon concurrently && \
     npm install -g vite esbuild prettier eslint @biomejs/biome tsc-watch
+
+# Install Bun (JavaScript runtime and package manager)
+RUN curl -fsSL https://bun.sh/install | bash && \
+    echo 'export PATH="$HOME/.bun/bin:$PATH"' >> ${USER_HOME}/.bashrc && \
+    echo 'export PATH="$HOME/.bun/bin:$PATH"' >> ${USER_HOME}/.zshrc
+
+# Make Bun available system-wide by adding to PATH
+USER root
+RUN echo 'export PATH="/home/vscode/.bun/bin:$PATH"' >> /etc/profile && \
+    ln -sf /home/vscode/.bun/bin/bun /usr/local/bin/bun && \
+    ln -sf /home/vscode/.bun/bin/bunx /usr/local/bin/bunx
+USER ${USERNAME}
 
 # Helpful TS aliases
 RUN echo '# TypeScript development aliases' >> ${USER_HOME}/.zshrc && \

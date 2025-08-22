@@ -14,8 +14,8 @@ IMAGE=ghcr.io/you/img:dev ./test  # Test remote tag
 ## 🔧 Stack
 Core:
 - Base: mcr.microsoft.com/devcontainers/python:3.12
-- Docker Engine + Buildx + Compose v2 (DinD-ready)
-- Node (nvm LTS) + npm + yarn + pnpm
+- Docker-in-Docker via devcontainer feature (ghcr.io/devcontainers/features/docker-in-docker:2)
+- Node (nvm LTS) + npm + yarn + pnpm + bun
 - TypeScript toolchain: typescript, ts-node, tsx, @types/node, nodemon, concurrently, vite, esbuild, prettier, eslint, @biomejs/biome, tsc-watch
 - Python: Poetry (Dockerfile install), venv-in-project support
 - AI CLIs: @google/gemini-cli, @anthropic-ai/claude-code
@@ -72,7 +72,19 @@ npx tsc --init
 - Node installed in Dockerfile (needed for AI CLIs)
 
 ## 🧹 Migration
-Legacy separate python/typescript images have been removed; everything lives in `containers/base/`.
+
+**v2.0 Unified Architecture:** Legacy separate `python/typescript/common` container configurations have been removed and replaced with a single unified container in `containers/base/`.
+
+**Key changes:**
+- ✅ **Single Container**: `containers/base/` replaces separate language containers
+- ✅ **Feature-Based**: Docker-in-Docker now uses devcontainer features instead of Dockerfile installs
+- ✅ **Simplified CI**: One image build instead of multiple container builds
+- ✅ **Registry**: Published to `ghcr.io/get2knowio/devcontainer:latest` (was `devcontainer-unified`)
+
+**Migration path:**
+- Update `.devcontainer/devcontainer.json` to reference: `ghcr.io/get2knowio/devcontainer:latest`
+- Remove any references to old image names (`devcontainer-python`, `devcontainer-typescript`)
+- All language tools (Python + TypeScript) are included in the unified image
 
 ## 📄 License
 See LICENSE file.

@@ -32,31 +32,25 @@ exec "$(dirname "$0")/scripts/<script-name>.sh" "$@"
 
 ### DevContainer Configuration
 
-**Rule: Use a common/specific merge pattern for devcontainer.json files.**
+**Rule: Use a unified container approach with devcontainer features.**
 
-- **Common Config**: Shared configuration in `containers/common/devcontainer.json`
-- **Specific Config**: Image-specific configuration in `containers/<type>/devcontainer.json` (only contains overrides/additions)
-- **Merge Process**: Use `scripts/merge-devcontainer.sh` to combine common and specific configurations during build
+- **Unified Container**: Single container in `containers/base/` that includes all development tools (Python, TypeScript, Docker-in-Docker, etc.)
+- **Features-Based**: Use DevContainer features instead of manual Dockerfile installations for better maintainability
+- **Clean Architecture**: Dockerfile focuses on core tools, devcontainer.json handles language-specific features
 
 **Rule: Prefer DevContainer Features over Dockerfile installations.**
 
 - **Features First**: Always use DevContainer features when available instead of manual Dockerfile installations
 - **Cleaner Maintenance**: Features are more maintainable, standardized, and less error-prone than custom Dockerfile commands
-- **Examples**: Use `ghcr.io/devcontainers/features/python:1` instead of `apt install python3`, use `ghcr.io/devcontainers-extra/features/poetry:2` instead of `curl -sSL https://install.python-poetry.org`
-- **Dockerfile Only**: Reserve Dockerfile for tools that don't have official DevContainer features
-- **Language-Specific Priority**: For language-specific containers (Python, TypeScript, etc.), prefer adding language tools via features in the devcontainer.json rather than manual Dockerfile installations
+- **Examples**: Use `ghcr.io/devcontainers/features/docker-in-docker:2` instead of manual Docker installation, use `ghcr.io/devcontainers/features/aws-cli:1` instead of manual AWS CLI setup
+- **Dockerfile Only**: Reserve Dockerfile for tools that don't have official DevContainer features (like custom CLI tools, specific language versions, etc.)
 
-**Example Structure:**
+**Current Structure:**
 ```
 containers/
-  common/
-    devcontainer.json          # Shared configuration
-  typescript/
-    devcontainer.json          # TypeScript-specific overrides
-    Dockerfile
-  python/
-    devcontainer.json          # Python-specific overrides  
-    Dockerfile
+  base/
+    devcontainer.json          # Unified configuration with features
+    Dockerfile                 # Core system setup and custom tools
 ```
 
 ## File Naming Conventions
@@ -74,9 +68,10 @@ containers/
 
 2. **Modifying Build Process**:
    - Update `scripts/build.sh` 
-   - Ensure changes work with the merge-devcontainer functionality
+   - Test with the unified container in `containers/base/`
 
 3. **DevContainer Changes**:
-   - Update common config in `containers/common/devcontainer.json` for shared changes
-   - Update specific config in `containers/<type>/devcontainer.json` for type-specific changes
-   - Test merge process with `scripts/merge-devcontainer.sh`
+   - Update configuration in `containers/base/devcontainer.json`
+   - Modify Dockerfile in `containers/base/Dockerfile` for custom tools only
+   - Use DevContainer features for language tools and standard services
+   - Test with `./build` command

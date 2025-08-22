@@ -44,6 +44,7 @@ PY
             command -v npm  >/dev/null 2>&1 && echo "✅ npm: $(npm --version)"   || { echo "❌ npm missing"; exit 1; }
             npx tsc --version >/dev/null 2>&1 && echo "✅ TypeScript: $(npx tsc --version)" || { echo "❌ TypeScript missing"; exit 1; }
             command -v pnpm >/dev/null 2>&1 && echo "✅ pnpm: $(pnpm --version)" || echo "ℹ️ pnpm not found"
+            command -v bun >/dev/null 2>&1 && echo "✅ bun: $(bun --version)" || echo "ℹ️ bun not found"
             command -v yarn >/dev/null 2>&1 && echo "✅ yarn: $(yarn --version)" || echo "ℹ️ yarn not found"
             command -v gemini >/dev/null 2>&1 && echo "ℹ️ Gemini CLI present" || true
             command -v claude >/dev/null 2>&1 && echo "ℹ️ Claude CLI present" || true
