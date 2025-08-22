@@ -48,60 +48,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image refs
-        id: refs
-        run: |
-          IMAGE_REPO_PREFIX="ghcr.io/get2knowio"
-          echo "repo=$IMAGE_REPO_PREFIX/devcontainer" >> $GITHUB_OUTPUT
-          echo "ci_tag=ci-${GITHUB_SHA}" >> $GITHUB_OUTPUT
-
-      - name: Build and push multi-arch unified image
+      - name: Build and push CI-tagged multi-arch image
         uses: devcontainers/ci@v0.3
         with:
-          configFile: containers/base/devcontainer.json
-          imageName: ${{ steps.refs.outputs.repo }}
-          imageTag: ${{ steps.refs.outputs.ci_tag }}
+          subFolder: containers/base
+          imageName: ${{ env.REGISTRY }}/get2knowio/devcontainer
+          cacheFrom: ${{ env.REGISTRY }}/get2knowio/devcontainer
           platform: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' && 'always' || 'never' }}
-          skipContainerUserIdUpdate: true
-          cacheFrom: ${{ steps.refs.outputs.repo }}:ci-${{ github.sha }}
-        env:
-          BUILDKIT_PROGRESS: plain
-          DOCKER_BUILDKIT: 1
-          CURL_CONNECT_TIMEOUT: 60
-          CURL_MAX_TIME: 300
-          APT_ACQUIRE_RETRIES: 3
+          imageTag: ci-${{ github.sha }}
+          push: always
 
-      - name: Build local test image
-        run: |
-          # Build a local copy using devcontainer CLI for testing
-          devcontainer build \
-            --workspace-folder containers/base \
-            --config containers/base/devcontainer.json \
-            --image-name ${{ steps.refs.outputs.repo }}:test-local
-
-      - name: Run tests against built image
+      - name: Test local image left by devcontainers/ci
         env:
-          IMAGE: ${{ steps.refs.outputs.repo }}:test-local
-          DIND_TESTS: false
+          # Test the local image for current architecture that was built by devcontainers/ci
+          # devcontainers/ci should leave a local copy tagged with the imageName:imageTag
+          IMAGE: ${{ env.REGISTRY }}/get2knowio/devcontainer:ci-${{ github.sha }}
         run: |
-          # Verify image exists locally
-          docker image inspect $IMAGE >/dev/null 2>&1 || { 
-            echo "❌ Image not available locally"
-            exit 1
-          }
+          echo "🧪 Testing locally available image: $IMAGE"
           
+          # Verify the local image exists
+          if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "❌ Local image not found: $IMAGE"
+            echo "Available images:"
+            docker images | grep devcontainer || true
+            exit 1
+          fi
+          
+          echo "✅ Local image found, running tests..."
           chmod +x ./scripts/*.sh || true
-          chmod +x ./build ./build.sh ./test || true
-          chmod +x ./scripts/test.sh
           ./scripts/test.sh
 
-      - name: Extract metadata
+      - name: Extract metadata for final tags
         if: github.event_name != 'pull_request'
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.refs.outputs.repo }}
+          images: ${{ env.REGISTRY }}/get2knowio/devcontainer
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -109,27 +91,19 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Select canonical tag
-        if: github.event_name != 'pull_request'
-        id: canonical
-        run: |
-          tags="${{ steps.meta.outputs.tags }}"
-          canonical=$(echo "$tags" | head -n1)
-          echo "canonical_ref=$canonical" >> $GITHUB_OUTPUT
-
       - name: Verify CI image availability
         if: github.event_name != 'pull_request'
         run: |
-          src_tag='${{ steps.refs.outputs.repo }}:ci-${{ github.sha }}'
-          echo "Verifying CI image: $src_tag"
+          ci_image='${{ env.REGISTRY }}/get2knowio/devcontainer:ci-${{ github.sha }}'
+          echo "Verifying CI image: $ci_image"
           
           # Try to inspect the remote image to ensure it exists
           max_attempts=5
           attempt=1
           while [ $attempt -le $max_attempts ]; do
-            echo "Attempt $attempt: Checking if $src_tag exists..."
-            if docker buildx imagetools inspect "$src_tag" >/dev/null 2>&1; then
-              echo "✅ CI image confirmed available: $src_tag"
+            echo "Attempt $attempt: Checking if $ci_image exists..."
+            if docker buildx imagetools inspect "$ci_image" >/dev/null 2>&1; then
+              echo "✅ CI image confirmed available: $ci_image"
               break
             fi
             echo "⏳ CI image not yet available, waiting..."
@@ -142,26 +116,17 @@ jobs:
             exit 1
           fi
 
-      - name: Promote CI image to canonical tag (manifest)
-        if: github.event_name != 'pull_request'
-        run: |
-          src_tag='${{ steps.refs.outputs.repo }}:ci-${{ github.sha }}'
-          dst_tag='${{ steps.canonical.outputs.canonical_ref }}'
-          echo "Promoting $src_tag -> $dst_tag"
-          docker buildx imagetools create --tag "$dst_tag" "$src_tag"
-
-      - name: Retag and publish additional tags as manifest list
+      - name: Promote CI image to final tags
         if: github.event_name != 'pull_request' && steps.meta.outputs.tags != ''
         run: |
-          canonical='${{ steps.canonical.outputs.canonical_ref }}'
-          echo "Canonical: $canonical"
-          echo "All tags:\n${{ steps.meta.outputs.tags }}"
+          ci_image='${{ env.REGISTRY }}/get2knowio/devcontainer:ci-${{ github.sha }}'
+          echo "Promoting CI image: $ci_image"
+          echo "Final tags:"
+          echo "${{ steps.meta.outputs.tags }}"
+          
+          # Retag CI image to each final tag
           while IFS= read -r tag; do
             [ -z "$tag" ] && continue
-            if [ "$tag" = "$canonical" ]; then
-              echo "Skip canonical tag $tag"
-              continue
-            fi
-            echo "Creating manifest tag: $tag -> $canonical"
-            docker buildx imagetools create --tag "$tag" "$canonical"
+            echo "Creating manifest tag: $tag -> $ci_image"
+            docker buildx imagetools create --tag "$tag" "$ci_image"
           done <<< "${{ steps.meta.outputs.tags }}"
