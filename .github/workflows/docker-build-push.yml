@@ -78,11 +78,11 @@ jobs:
           devcontainer build \
             --workspace-folder containers/base \
             --config containers/base/devcontainer.json \
-            --image-name ${{ steps.refs.outputs.repo }}:${{ steps.refs.outputs.ci_tag }}
+            --image-name ${{ steps.refs.outputs.repo }}:test-local
 
       - name: Run tests against built image
         env:
-          IMAGE: ${{ steps.refs.outputs.repo }}:${{ steps.refs.outputs.ci_tag }}
+          IMAGE: ${{ steps.refs.outputs.repo }}:test-local
           DIND_TESTS: false
         run: |
           # Verify image exists locally
@@ -116,6 +116,31 @@ jobs:
           tags="${{ steps.meta.outputs.tags }}"
           canonical=$(echo "$tags" | head -n1)
           echo "canonical_ref=$canonical" >> $GITHUB_OUTPUT
+
+      - name: Verify CI image availability
+        if: github.event_name != 'pull_request'
+        run: |
+          src_tag='${{ steps.refs.outputs.repo }}:ci-${{ github.sha }}'
+          echo "Verifying CI image: $src_tag"
+          
+          # Try to inspect the remote image to ensure it exists
+          max_attempts=5
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt: Checking if $src_tag exists..."
+            if docker buildx imagetools inspect "$src_tag" >/dev/null 2>&1; then
+              echo "✅ CI image confirmed available: $src_tag"
+              break
+            fi
+            echo "⏳ CI image not yet available, waiting..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+          
+          if [ $attempt -gt $max_attempts ]; then
+            echo "❌ CI image not available after $max_attempts attempts"
+            exit 1
+          fi
 
       - name: Promote CI image to canonical tag (manifest)
         if: github.event_name != 'pull_request'
