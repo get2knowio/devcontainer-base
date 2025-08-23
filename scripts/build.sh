@@ -109,8 +109,8 @@ verify_prerequisites() {
         exit 1
     fi
     
-    if [[ ! -f "$container_dir/devcontainer.json" ]]; then
-        echo -e "${RED}❌ devcontainer.json not found in $container_dir${NC}"
+    if [[ ! -f "$container_dir/.devcontainer/devcontainer.json" ]]; then
+        echo -e "${RED}❌ devcontainer config not found: $container_dir/.devcontainer/devcontainer.json${NC}"
         exit 1
     fi
     
@@ -153,10 +153,12 @@ create_temp_workspace() {
     # Use the container's devcontainer.json directly (inheritance handled by Dockerfiles)
     local container_dir="$SCRIPT_DIR/containers/base"
     echo -e "${BLUE}📄 Using $CONTAINER_TYPE devcontainer.json directly...${NC}"
-    cp "$container_dir/devcontainer.json" "$TEMP_DIR/.devcontainer/devcontainer.json"
+    # Copy canonical devcontainer.json from .devcontainer directory
+    cp "$container_dir/.devcontainer/devcontainer.json" "$TEMP_DIR/.devcontainer/devcontainer.json"
     
-    # Copy Dockerfile to .devcontainer directory (where devcontainer.json expects it)
-    cp "$container_dir/Dockerfile" "$TEMP_DIR/.devcontainer/"
+    # Copy Dockerfile to the temporary workspace root so relative paths like
+    # "../Dockerfile" from .devcontainer/devcontainer.json resolve to $TEMP_DIR/Dockerfile
+    cp "$container_dir/Dockerfile" "$TEMP_DIR/"
     
     # Copy any other files that might be referenced in the Dockerfile
     if [[ -f "$SCRIPT_DIR/.dockerignore" ]]; then

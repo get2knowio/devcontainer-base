@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience wrapper for scripts/promote-image.sh
+exec "$(dirname "$0")/scripts/promote-image.sh" "$@"

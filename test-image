@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience wrapper for scripts/test-image.sh
+exec "$(dirname "$0")/scripts/test-image.sh" "$@"

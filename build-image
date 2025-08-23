@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience wrapper for scripts/build-image.sh
+exec "$(dirname "$0")/scripts/build-image.sh" "$@"

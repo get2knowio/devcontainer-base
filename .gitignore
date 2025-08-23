@@ -1,1 +1,4 @@
 .DS_Store
+.env
+.secrets
+.ci-env.cache

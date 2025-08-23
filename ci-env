@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience wrapper for scripts/ci-env.sh
+exec "$(dirname "$0")/scripts/ci-env.sh" "$@"

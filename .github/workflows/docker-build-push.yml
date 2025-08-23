@@ -22,64 +22,51 @@ jobs:
       contents: read
       packages: write
       id-token: write
+    strategy:
+      matrix:
+        mode: [ci, local-act]
+    env:
+      MODE: ${{ matrix.mode }}
+      IMAGE_REPO: get2knowio/devcontainer
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js (for DevContainer CLI)
+      - name: Set up Node.js (DevContainer CLI)
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
 
       - name: Install DevContainer CLI
-        run: |
-          npm install -g @devcontainers/cli
+        run: npm install -g @devcontainers/cli
 
-      - name: Set up QEMU (for cross-arch)
+      - name: Set up QEMU (multi-arch only)
+        if: matrix.mode == 'ci'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
+        if: matrix.mode == 'ci'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push CI-tagged multi-arch image
-        uses: devcontainers/ci@v0.3
-        with:
-          subFolder: containers/base
-          imageName: ${{ env.REGISTRY }}/get2knowio/devcontainer
-          cacheFrom: ${{ env.REGISTRY }}/get2knowio/devcontainer
-          platform: linux/amd64,linux/arm64
-          imageTag: ci-${{ github.sha }}
-          push: always
+      - name: Bootstrap environment
+        run: ./ci-env
 
-      - name: Test local image left by devcontainers/ci
-        env:
-          # Test the local image for current architecture that was built by devcontainers/ci
-          # devcontainers/ci should leave a local copy tagged with the imageName:imageTag
-          IMAGE: ${{ env.REGISTRY }}/get2knowio/devcontainer:ci-${{ github.sha }}
-        run: |
-          echo "🧪 Testing locally available image: $IMAGE"
-          
-          # Verify the local image exists
-          if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-            echo "❌ Local image not found: $IMAGE"
-            echo "Available images:"
-            docker images | grep devcontainer || true
-            exit 1
-          fi
-          
-          echo "✅ Local image found, running tests..."
-          chmod +x ./scripts/*.sh || true
-          ./scripts/test.sh
+      - name: Build image
+        run: ./build-image
 
-      - name: Extract metadata for final tags
-        if: github.event_name != 'pull_request'
+      - name: Test image
+        id: test
+        run: ./test-image
+
+      - name: Extract metadata tags (CI only, non-PR)
+        if: matrix.mode == 'ci' && github.event_name != 'pull_request'
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -91,42 +78,18 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Verify CI image availability
-        if: github.event_name != 'pull_request'
+      - name: Write tag list file
+        if: matrix.mode == 'ci' && github.event_name != 'pull_request'
         run: |
-          ci_image='${{ env.REGISTRY }}/get2knowio/devcontainer:ci-${{ github.sha }}'
-          echo "Verifying CI image: $ci_image"
-          
-          # Try to inspect the remote image to ensure it exists
-          max_attempts=5
-          attempt=1
-          while [ $attempt -le $max_attempts ]; do
-            echo "Attempt $attempt: Checking if $ci_image exists..."
-            if docker buildx imagetools inspect "$ci_image" >/dev/null 2>&1; then
-              echo "✅ CI image confirmed available: $ci_image"
-              break
-            fi
-            echo "⏳ CI image not yet available, waiting..."
-            sleep 10
-            attempt=$((attempt + 1))
-          done
-          
-          if [ $attempt -gt $max_attempts ]; then
-            echo "❌ CI image not available after $max_attempts attempts"
-            exit 1
-          fi
+          echo "${{ steps.meta.outputs.tags }}" > final-tags.txt
+          echo "Written tags:" && cat final-tags.txt
 
-      - name: Promote CI image to final tags
-        if: github.event_name != 'pull_request' && steps.meta.outputs.tags != ''
+      - name: Promote image (CI only)
+        if: matrix.mode == 'ci' && github.event_name != 'pull_request' && steps.meta.outputs.tags != ''
+        run: ./promote-image
+
+      - name: Fail if tests failed
+        if: always() && steps.test.outcome != 'success'
         run: |
-          ci_image='${{ env.REGISTRY }}/get2knowio/devcontainer:ci-${{ github.sha }}'
-          echo "Promoting CI image: $ci_image"
-          echo "Final tags:"
-          echo "${{ steps.meta.outputs.tags }}"
-          
-          # Retag CI image to each final tag
-          while IFS= read -r tag; do
-            [ -z "$tag" ] && continue
-            echo "Creating manifest tag: $tag -> $ci_image"
-            docker buildx imagetools create --tag "$tag" "$ci_image"
-          done <<< "${{ steps.meta.outputs.tags }}"
+          echo "::error::Tests failed in mode ${{ matrix.mode }}"
+          exit 1

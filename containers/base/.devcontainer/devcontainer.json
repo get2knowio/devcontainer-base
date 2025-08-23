@@ -1,8 +1,10 @@
 {
+  // Canonical devcontainer.json lives under .devcontainer/ to satisfy devcontainers/ci and CLI expectations.
+  // Dockerfile stays one directory up to keep it adjacent to related build assets.
   "name": "Unified DevContainer (Python + TypeScript)",
   "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".",
+    "dockerfile": "../Dockerfile",
+    "context": "..",
     "args": {
       "BUILDKIT_INLINE_CACHE": "1"
     }
