@@ -18,9 +18,19 @@ export IMAGE
 echo "[test-image] Testing image: ${IMAGE}" >&2
 
 if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
-  echo "[test-image] ERROR: Image not found locally: ${IMAGE}" >&2
-  docker images | head -n 50 >&2 || true
-  exit 1
+  echo "[test-image] Image not found locally; attempting pull: ${IMAGE}" >&2
+  if ! docker pull "${IMAGE}" >/dev/null 2>&1; then
+    echo "[test-image] ERROR: Unable to pull image: ${IMAGE}" >&2
+    docker images | head -n 50 >&2 || true
+    exit 1
+  fi
+  if docker image inspect "${IMAGE}" >/dev/null 2>&1; then
+    echo "[test-image] Pulled image successfully." >&2
+  else
+    echo "[test-image] ERROR: Image still not present after pull: ${IMAGE}" >&2
+    docker images | head -n 50 >&2 || true
+    exit 1
+  fi
 fi
 
 chmod +x "${ROOT_DIR}/scripts"/*.sh || true

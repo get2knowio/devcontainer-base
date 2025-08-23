@@ -9,6 +9,8 @@ Build, test, run:
 ./test                  # Validate toolchain + DinD
 ./build ghcr.io/you/img:dev   # Custom tag
 IMAGE=ghcr.io/you/img:dev ./test  # Test remote tag
+./run-local             # Run full workflow locally (single-job, local mode)
+./run-local --ci        # Force CI mode locally (multi-arch prep, tag steps)
 ```
 
 ## 🔧 Stack
@@ -43,7 +45,7 @@ Skip DinD:
 DIND_TESTS=false ./test
 ```
 
-## � Layout
+## 📁 Layout
 ```
 containers/base/ (devcontainer.json + Dockerfile)
 scripts/build.sh  (devcontainer CLI build wrapper)
@@ -51,9 +53,25 @@ scripts/test.sh   (image validation + DinD smoke)
 build / test      (thin wrappers)
 ```
 
-## 🛠️ CI
+## 🛠️ CI & Local Workflow
 Workflow: `.github/workflows/docker-build-push.yml`
-Single job builds multi-arch image, runs tests, promotes CI tag to canonical tags.
+
+Single job; MODE is auto-detected:
+- `ci` when running in GitHub Actions (multi-arch build, login, metadata & promote)
+- `local-act` when run via `act` or plain local shell (single-arch build, no push, skips tag/promotion)
+
+Helpers:
+```bash
+./run-local          # Executes workflow via act (local mode)
+./run-local --ci     # act with MODE=ci (simulate CI path)
+MODE=ci ./ci-env     # Manually force before scripts
+```
+
+Core scripts (used by workflow & you directly):
+- `./ci-env` -> Detects MODE, writes `.ci-env.cache`
+- `./build-image` -> Build (multi-arch only in ci)
+- `./test-image` -> Run validation suite
+- `./promote-image` -> Tags & manifest creation (no-op in local mode)
 
 ## 🧰 Usage patterns
 Python project:
@@ -70,6 +88,7 @@ npx tsc --init
 - User: vscode (sudo)
 - Multi-arch: linux/amd64, linux/arm64
 - Node installed in Dockerfile (needed for AI CLIs)
+- Local mode avoids QEMU + registry login for speed; force CI logic with `./run-local --ci`.
 
 ## 🧹 Migration
 
