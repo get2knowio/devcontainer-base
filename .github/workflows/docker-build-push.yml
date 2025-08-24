@@ -47,6 +47,24 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
+      # QEMU not strictly required for single-arch arm64 builds, but safe if we later re-add multi-arch
+      - name: Set up QEMU (arm64)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      # Set up a docker-container buildx builder (supports OCI exporter) instead of default docker driver
+      - name: Set up Buildx (docker-container driver)
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          driver: docker-container
+          use: true
+          buildkitd-flags: --debug
+
+      - name: Show buildx info
+        run: docker buildx inspect --bootstrap
+
       - name: Build and run DevContainer
         uses: devcontainers/ci@v0.3
         with:
