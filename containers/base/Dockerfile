@@ -48,10 +48,14 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
     ln -sf /usr/bin/fdfind /usr/bin/fd && \
     # Install eza (not in Debian repos) via GitHub release
     ARCH=$(dpkg --print-architecture) && \
-    EZA_DEB_URL="https://github.com/eza-community/eza/releases/download/v0.18.18/eza_${ARCH}.deb" && \
-    curl -fsSL -o /tmp/eza.deb "$EZA_DEB_URL" && \
-    apt-get install -y /tmp/eza.deb || echo 'eza install failed; continuing' && \
-    rm -f /tmp/eza.deb && \
+    case "$ARCH" in \
+        amd64) EZA_ARCH="x86_64" ;; \
+        arm64) EZA_ARCH="aarch64" ;; \
+        *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    esac && \
+    EZA_VERSION="0.23.0" && \
+    EZA_TAR_URL="https://github.com/eza-community/eza/releases/download/v${EZA_VERSION}/eza_${EZA_ARCH}-unknown-linux-gnu.tar.gz" && \
+    curl -fsSL "$EZA_TAR_URL" | tar -xzf - -C /usr/local/bin/ && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------------
