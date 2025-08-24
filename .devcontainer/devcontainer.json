@@ -11,7 +11,8 @@
         "ghcr.io/devcontainers/features/node:1": {
             "version": "lts"
         },
-        "ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {}
+        "ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {},
+        "ghcr.io/dhoeric/features/act:1": {}
     },
     "customizations": {
         "vscode": {

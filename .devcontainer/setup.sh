@@ -17,7 +17,6 @@ devcontainer --version
 
 # Make test scripts executable
 chmod +x scripts/test.sh
-chmod +x scripts/build.sh
 
 # Verify Docker access
 echo "🐳 Verifying Docker access..."

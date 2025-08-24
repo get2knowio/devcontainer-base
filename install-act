@@ -1,3 +1,0 @@
-#!/bin/bash
-# Convenience wrapper for scripts/install-act.sh
-exec "$(dirname "$0")/scripts/install-act.sh" "$@"

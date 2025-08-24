@@ -1,3 +1,0 @@
-#!/bin/bash
-# Convenience wrapper for scripts/run-workflow-locally.sh
-exec "$(dirname "$0")/scripts/run-workflow-locally.sh" "$@"
