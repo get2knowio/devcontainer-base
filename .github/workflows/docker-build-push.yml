@@ -53,7 +53,7 @@ jobs:
           configFile: containers/base/.devcontainer/devcontainer.json
           imageName: ghcr.io/get2knowio/devcontainer
           cacheFrom: ghcr.io/get2knowio/devcontainer
-          platform: linux/amd64,linux/arm64
+          platform: linux/arm64
           push: ${{ github.event_name != 'pull_request' && 'always' || 'never' }}
           runCmd: |
             echo "=== DevContainer Build Complete ==="
