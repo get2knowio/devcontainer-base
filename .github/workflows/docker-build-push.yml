@@ -47,23 +47,14 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Convert tags to comma-separated format
-        id: tags
-        run: |
-          # Convert multi-line tags to comma-separated format
-          TAGS=$(echo "${{ steps.meta.outputs.tags }}" | tr '\n' ',' | sed 's/,$//')
-          echo "comma_separated_tags=$TAGS" >> "$GITHUB_OUTPUT"
-          echo "Tags: $TAGS"
-
       - name: Build and run DevContainer
         uses: devcontainers/ci@v0.3
         with:
           configFile: containers/base/.devcontainer/devcontainer.json
-          imageName: ${{ env.REGISTRY }}/get2knowio/devcontainer
-          cacheFrom: ${{ env.REGISTRY }}/get2knowio/devcontainer
+          imageName: ghcr.io/get2knowio/devcontainer
+          cacheFrom: ghcr.io/get2knowio/devcontainer
           platform: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' && 'always' || 'never' }}
-          imageTag: ${{ steps.tags.outputs.comma_separated_tags }}
           runCmd: |
             echo "=== DevContainer Build Complete ==="
             echo "Running tests..."
