@@ -28,54 +28,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js (DevContainer CLI)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-
-      - name: Install DevContainer CLI
-        run: npm install -g @devcontainers/cli
-
-      - name: Bootstrap environment (derive MODE)
-        id: bootstrap
-        run: |
-          ./ci-env
-          # .ci-env.cache should now exist with exported variables
-          echo "--- ci-env.cache ---"
-          if [ -f .ci-env.cache ]; then
-            cat .ci-env.cache
-          else
-            echo "(missing .ci-env.cache)"
-          fi
-          # shellcheck disable=SC1091
-          . ./.ci-env.cache
-          echo "Mode detected: $MODE"
-          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU (multi-arch only)
-        if: steps.bootstrap.outputs.mode == 'ci'
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Log in to Container Registry
-        if: steps.bootstrap.outputs.mode == 'ci'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image
-        run: ./build-image
-
-      - name: Test image
-        id: test
-        run: ./test-image
-
-      - name: Extract metadata tags (CI only, non-PR)
-        if: steps.bootstrap.outputs.mode == 'ci' && github.event_name != 'pull_request'
+      - name: Extract metadata tags
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -87,18 +47,25 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Write tag list file
-        if: steps.bootstrap.outputs.mode == 'ci' && github.event_name != 'pull_request'
+      - name: Convert tags to comma-separated format
+        id: tags
         run: |
-          echo "${{ steps.meta.outputs.tags }}" > final-tags.txt
-          echo "Written tags:" && cat final-tags.txt
+          # Convert multi-line tags to comma-separated format
+          TAGS=$(echo "${{ steps.meta.outputs.tags }}" | tr '\n' ',' | sed 's/,$//')
+          echo "comma_separated_tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "Tags: $TAGS"
 
-      - name: Promote image (CI only)
-        if: steps.bootstrap.outputs.mode == 'ci' && github.event_name != 'pull_request' && steps.meta.outputs.tags != ''
-        run: ./promote-image
-
-      - name: Fail if tests failed
-        if: always() && steps.test.outcome != 'success'
-        run: |
-          echo "::error::Tests failed in mode ${{ steps.bootstrap.outputs.mode }}"
-          exit 1
+      - name: Build and run DevContainer
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: containers/base/.devcontainer/devcontainer.json
+          imageName: ${{ env.REGISTRY }}/get2knowio/devcontainer
+          cacheFrom: ${{ env.REGISTRY }}/get2knowio/devcontainer
+          platform: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' && 'always' || 'never' }}
+          imageTag: ${{ steps.tags.outputs.comma_separated_tags }}
+          runCmd: |
+            echo "=== DevContainer Build Complete ==="
+            echo "Running tests..."
+            ./test
+            echo "=== Tests Complete ==="

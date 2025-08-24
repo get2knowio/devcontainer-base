@@ -2,13 +2,15 @@
 #  Unified Development Container - Python + TypeScript
 #
 #  Single image starting from the official DevContainers Python image
-#  with additional common tooling, Docker Engine (DinD), Node.js via nvm,
-#  global TypeScript tooling, AI CLIs, and Poetry installed in Dockerfile.
+#  with additional common tooling, Node.js via nvm, global TypeScript 
+#  tooling, AI CLIs, and Poetry installed in Dockerfile.
+#
+#  Docker is provided via the docker-in-docker feature in devcontainer.json
 #
 #  Highlights:
 #    • Base: mcr.microsoft.com/devcontainers/python:3.12
 #    • Common CLI tools: eza, bat, ripgrep, fd-find, jq, fzf
-#    • Docker Engine + CLI + Buildx + Compose v2 (DinD capable)
+#    • Docker via docker-in-docker feature (not in Dockerfile)
 #    • Starship prompt + zsh enhancements
 #    • Node.js LTS via nvm (NOT a feature) + npm global tools
 #    • AI CLIs: @google/gemini-cli, @anthropic-ai/claude-code
@@ -41,7 +43,7 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
     apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential bat ripgrep fd-find jq fzf curl ca-certificates \
-        python3-venv && \
+        python3-venv gnupg2 lsb-release && \
     ln -sf /usr/bin/batcat /usr/bin/bat && \
     ln -sf /usr/bin/fdfind /usr/bin/fd && \
     # Install eza (not in Debian repos) via GitHub release
@@ -61,15 +63,7 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y && \
     echo 'eval "$(starship init zsh)"'                               >> ${USER_HOME}/.zshrc && \
     echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.zshrc && \
     echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.zshrc && \
-    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc && \
-    echo 'alias dps="docker ps"'                                     >> ${USER_HOME}/.zshrc && \
-    echo 'alias dpsa="docker ps -a"'                                 >> ${USER_HOME}/.zshrc && \
-    echo 'alias di="docker images"'                                  >> ${USER_HOME}/.zshrc && \
-    echo 'alias dlog="docker logs"'                                  >> ${USER_HOME}/.zshrc && \
-    echo 'alias dexec="docker exec -it"'                             >> ${USER_HOME}/.zshrc && \
-    echo 'alias dc="docker compose"'                                 >> ${USER_HOME}/.zshrc && \
-    echo 'alias dcup="docker compose up"'                            >> ${USER_HOME}/.zshrc && \
-    echo 'alias dcdown="docker compose down"'                        >> ${USER_HOME}/.zshrc
+    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc
 
 # Prepare for Node (nvm) in shell profiles
 RUN echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.zshrc && \
