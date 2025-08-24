@@ -59,7 +59,7 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------------
-# Starship prompt and zsh enhancements
+# Starship prompt and shell enhancements
 # ------------------------------------------------------------------
 RUN curl -sS https://starship.rs/install.sh | sh -s -- -y && \
     mkdir -p ${USER_HOME}/.config && \
@@ -67,7 +67,11 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y && \
     echo 'eval "$(starship init zsh)"'                               >> ${USER_HOME}/.zshrc && \
     echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.zshrc && \
     echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.zshrc && \
-    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc
+    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc && \
+    echo 'eval "$(starship init bash)"'                              >> ${USER_HOME}/.bashrc && \
+    echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.bashrc && \
+    echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.bashrc && \
+    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.bashrc
 
 # Prepare for Node (nvm) in shell profiles
 RUN echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.zshrc && \
@@ -103,7 +107,7 @@ RUN echo 'export PATH="/home/vscode/.bun/bin:$PATH"' >> /etc/profile && \
     ln -sf /home/vscode/.bun/bin/bunx /usr/local/bin/bunx
 USER ${USERNAME}
 
-# Helpful TS aliases
+# Helpful TS aliases for zsh
 RUN echo '# TypeScript development aliases' >> ${USER_HOME}/.zshrc && \
     echo 'alias tsc="npx tsc"' >> ${USER_HOME}/.zshrc && \
     echo 'alias tsx="npx tsx"' >> ${USER_HOME}/.zshrc && \
@@ -114,8 +118,20 @@ RUN echo '# TypeScript development aliases' >> ${USER_HOME}/.zshrc && \
     echo 'alias lint="npm run lint"' >> ${USER_HOME}/.zshrc && \
     echo 'alias format="npm run format"' >> ${USER_HOME}/.zshrc && \
     echo '# Add npm completion if available' >> ${USER_HOME}/.zshrc && \
-    echo 'if command -v npm >/dev/null 2>&1; then eval "$(npm completion zsh)"; fi' >> ${USER_HOME}/.zshrc && \
-    cp ${USER_HOME}/.zshrc ${USER_HOME}/.bashrc
+    echo 'if command -v npm >/dev/null 2>&1; then eval "$(npm completion zsh)"; fi' >> ${USER_HOME}/.zshrc
+
+# Helpful TS aliases for bash (separate from zsh to avoid conflicts)
+RUN echo '# TypeScript development aliases' >> ${USER_HOME}/.bashrc && \
+    echo 'alias tsc="npx tsc"' >> ${USER_HOME}/.bashrc && \
+    echo 'alias tsx="npx tsx"' >> ${USER_HOME}/.bashrc && \
+    echo 'alias tsw="npx tsc-watch"' >> ${USER_HOME}/.bashrc && \
+    echo 'alias dev="npm run dev"' >> ${USER_HOME}/.bashrc && \
+    echo 'alias build="npm run build"' >> ${USER_HOME}/.bashrc && \
+    echo 'alias test="npm test"' >> ${USER_HOME}/.bashrc && \
+    echo 'alias lint="npm run lint"' >> ${USER_HOME}/.bashrc && \
+    echo 'alias format="npm run format"' >> ${USER_HOME}/.bashrc && \
+    echo '# Add npm completion if available' >> ${USER_HOME}/.bashrc && \
+    echo 'if command -v npm >/dev/null 2>&1; then eval "$(npm completion bash)"; fi' >> ${USER_HOME}/.bashrc
 
 # ------------------------------------------------------------------
 # Poetry installation (Dockerfile, not a feature)
@@ -129,6 +145,11 @@ RUN curl -sSL https://install.python-poetry.org | python3 - --version ${POETRY_V
 # Configure Poetry for vscode user (in-project virtualenvs)
 USER ${USERNAME}
 RUN poetry config virtualenvs.in-project true --local || true
+
+# Set zsh as the default shell for the vscode user
+USER root
+RUN chsh -s /usr/bin/zsh ${USERNAME}
+USER ${USERNAME}
 
 # Final setup
 WORKDIR /workspace

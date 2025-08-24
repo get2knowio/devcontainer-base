@@ -27,5 +27,12 @@
   "privileged": true,
   "remoteUser": "vscode",
   "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
   "postCreateCommand": "poetry --version && node --version && npm --version && (tsc --version || npx tsc --version)"
 }
