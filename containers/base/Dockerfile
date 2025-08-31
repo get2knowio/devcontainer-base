@@ -43,7 +43,7 @@ RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
     apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential bat ripgrep fd-find jq fzf curl ca-certificates \
-        python3-venv gnupg2 lsb-release && \
+        python3-venv gnupg2 lsb-release tini && \
     ln -sf /usr/bin/batcat /usr/bin/bat && \
     ln -sf /usr/bin/fdfind /usr/bin/fd && \
     # Install eza (not in Debian repos) via GitHub release
@@ -153,4 +153,10 @@ USER ${USERNAME}
 
 # Final setup
 WORKDIR /workspace
-CMD ["zsh"]
+# Use tini as PID 1 for proper signal handling and zombie reaping. Note that
+# devcontainer.json already sets "init": true, which makes VS Code add
+# --init (Docker's embedded tini). We vendor tini anyway so manual docker run
+# invocations without --init behave the same. Safe no-op duplication.
+ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
+# Keep container alive for VS Code to attach; shells are launched on demand.
+CMD ["sleep", "infinity"]

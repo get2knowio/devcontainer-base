@@ -23,7 +23,6 @@
   },
   "runArgs": ["--privileged"],
   "overrideCommand": false,
-  "init": true,
   "privileged": true,
   "remoteUser": "vscode",
   "workspaceFolder": "/workspace",
