@@ -22,6 +22,7 @@
 #  Workspace: /workspace
 ########################################################################
 
+# syntax=docker/dockerfile:1.7-labs
 FROM mcr.microsoft.com/devcontainers/python:3.12
 
 LABEL maintainer="you@example.com"
@@ -32,31 +33,37 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NVM_VERSION=0.40.3 \
     NVM_DIR=/home/vscode/.nvm \
     CURL_CONNECT_TIMEOUT=60 \
-    CURL_MAX_TIME=300
+    CURL_MAX_TIME=300 \
+    POETRY_VERSION=1.8.3
+
+# Build args (can be overridden) for conditional installs / tuning
+ARG INSTALL_AI_CLIS=true
+ARG EZA_VERSION=0.23.0
 
 # ------------------------------------------------------------------
 # Essential system packages and modern CLI tools
 # ------------------------------------------------------------------
-RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
     echo 'Acquire::http::Timeout "60";' > /etc/apt/apt.conf.d/80-timeouts && \
     echo 'Acquire::https::Timeout "60";' >> /etc/apt/apt.conf.d/80-timeouts && \
-    apt-get update && apt-get upgrade -y && \
+    apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential bat ripgrep fd-find jq fzf curl ca-certificates \
         python3-venv gnupg2 lsb-release tini && \
     ln -sf /usr/bin/batcat /usr/bin/bat && \
     ln -sf /usr/bin/fdfind /usr/bin/fd && \
-    # Install eza (not in Debian repos) via GitHub release
     ARCH=$(dpkg --print-architecture) && \
     case "$ARCH" in \
         amd64) EZA_ARCH="x86_64" ;; \
         arm64) EZA_ARCH="aarch64" ;; \
         *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
     esac && \
-    EZA_VERSION="0.23.0" && \
     EZA_TAR_URL="https://github.com/eza-community/eza/releases/download/v${EZA_VERSION}/eza_${EZA_ARCH}-unknown-linux-gnu.tar.gz" && \
     curl -fsSL "$EZA_TAR_URL" | tar -xzf - -C /usr/local/bin/ && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------------
 # Starship prompt and shell enhancements
@@ -87,10 +94,12 @@ RUN echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.
 USER ${USERNAME}
 
 # Node.js LTS via nvm, then global tooling and AI CLIs
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash && \
+RUN --mount=type=cache,target=/home/vscode/.cache,uid=1000,gid=1000 \
+    --mount=type=cache,target=/home/vscode/.npm,uid=1000,gid=1000 \
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash && \
     export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && \
     nvm install --lts && nvm alias default 'lts/*' && \
-    npm install -g @google/gemini-cli @anthropic-ai/claude-code && \
+    if [ "${INSTALL_AI_CLIS}" = "true" ]; then npm install -g @google/gemini-cli @anthropic-ai/claude-code; fi && \
     npm install -g pnpm yarn && \
     npm install -g typescript ts-node tsx @types/node nodemon concurrently && \
     npm install -g vite esbuild prettier eslint @biomejs/biome tsc-watch
@@ -137,14 +146,15 @@ RUN echo '# TypeScript development aliases' >> ${USER_HOME}/.bashrc && \
 # Poetry installation (Dockerfile, not a feature)
 # ------------------------------------------------------------------
 USER root
-ENV POETRY_HOME=/opt/poetry \
-    POETRY_VERSION=1.8.3
-RUN curl -sSL https://install.python-poetry.org | python3 - --version ${POETRY_VERSION} && \
+ENV POETRY_HOME=/opt/poetry
+RUN --mount=type=cache,target=/root/.cache/pip \
+    curl -sSL https://install.python-poetry.org | python3 - --version ${POETRY_VERSION} && \
     ln -s ${POETRY_HOME}/bin/poetry /usr/local/bin/poetry
 
 # Configure Poetry for vscode user (in-project virtualenvs)
 USER ${USERNAME}
-RUN poetry config virtualenvs.in-project true --local || true
+# Set global Poetry config (cannot use --local without a pyproject)
+RUN poetry config virtualenvs.in-project true --global || true
 
 # Set zsh as the default shell for the vscode user
 USER root
