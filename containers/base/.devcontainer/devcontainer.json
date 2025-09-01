@@ -21,9 +21,7 @@
       "dockerDashComposeVersion": "v2"
     }
   },
-  "init": true,
   "runArgs": ["--privileged"],
-  "overrideCommand": false,
   "privileged": true,
   "remoteUser": "vscode",
   "workspaceFolder": "/workspace",

@@ -27,18 +27,22 @@ FROM mcr.microsoft.com/devcontainers/python:3.12
 
 LABEL maintainer="you@example.com"
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    USERNAME=vscode \
-    USER_HOME=/home/vscode \
-    NVM_VERSION=0.40.3 \
-    NVM_DIR=/home/vscode/.nvm \
-    CURL_CONNECT_TIMEOUT=60 \
-    CURL_MAX_TIME=300 \
-    POETRY_VERSION=1.8.3
-
-# Build args (can be overridden) for conditional installs / tuning
+# Build-time args (override with --build-arg) — only promote what we need.
+ARG USERNAME=vscode
+ARG USER_HOME=/home/vscode
+ARG NVM_VERSION=0.40.3
+ARG NVM_DIR=/home/vscode/.nvm
+ARG POETRY_VERSION=1.8.3
 ARG INSTALL_AI_CLIS=true
 ARG EZA_VERSION=0.23.0
+ARG CURL_CONNECT_TIMEOUT=60
+ARG CURL_MAX_TIME=300
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Promote only the ones needed at runtime
+ENV USERNAME=${USERNAME} \
+    USER_HOME=${USER_HOME} \
+    NVM_DIR=${NVM_DIR}
 
 # ------------------------------------------------------------------
 # Essential system packages and modern CLI tools
@@ -52,7 +56,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential bat ripgrep fd-find jq fzf curl ca-certificates \
-        python3-venv gnupg2 lsb-release tini && \
+        python3-venv gnupg2 lsb-release && \
     ln -sf /usr/bin/batcat /usr/bin/bat && \
     ln -sf /usr/bin/fdfind /usr/bin/fd && \
     ARCH=$(dpkg --print-architecture) && \
@@ -74,18 +78,12 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y && \
     echo 'eval "$(starship init zsh)"'                               >> ${USER_HOME}/.zshrc && \
     echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.zshrc && \
     echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.zshrc && \
-    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc && \
-    echo 'eval "$(starship init bash)"'                              >> ${USER_HOME}/.bashrc && \
-    echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.bashrc && \
-    echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.bashrc && \
-    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.bashrc
+    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc
 
 # Prepare for Node (nvm) in shell profiles
 RUN echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.zshrc && \
     echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'   >> ${USER_HOME}/.zshrc && \
-    echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.bashrc && \
-    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'   >> ${USER_HOME}/.bashrc && \
-    echo '[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"' >> ${USER_HOME}/.bashrc && \
+
     chown -R ${USERNAME}:${USERNAME} ${USER_HOME}
 
 # ------------------------------------------------------------------
@@ -96,7 +94,7 @@ USER ${USERNAME}
 # Node.js LTS via nvm, then global tooling and AI CLIs
 RUN --mount=type=cache,target=/home/vscode/.cache,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/vscode/.npm,uid=1000,gid=1000 \
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash && \
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | zsh && \
     export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && \
     nvm install --lts && nvm alias default 'lts/*' && \
     if [ "${INSTALL_AI_CLIS}" = "true" ]; then npm install -g @google/gemini-cli @anthropic-ai/claude-code; fi && \
@@ -105,8 +103,7 @@ RUN --mount=type=cache,target=/home/vscode/.cache,uid=1000,gid=1000 \
     npm install -g vite esbuild prettier eslint @biomejs/biome tsc-watch
 
 # Install Bun (JavaScript runtime and package manager)
-RUN curl -fsSL https://bun.sh/install | bash && \
-    echo 'export PATH="$HOME/.bun/bin:$PATH"' >> ${USER_HOME}/.bashrc && \
+RUN curl -fsSL https://bun.sh/install | zsh && \
     echo 'export PATH="$HOME/.bun/bin:$PATH"' >> ${USER_HOME}/.zshrc
 
 # Make Bun available system-wide by adding to PATH
@@ -129,19 +126,6 @@ RUN echo '# TypeScript development aliases' >> ${USER_HOME}/.zshrc && \
     echo '# Add npm completion if available' >> ${USER_HOME}/.zshrc && \
     echo 'if command -v npm >/dev/null 2>&1; then eval "$(npm completion zsh)"; fi' >> ${USER_HOME}/.zshrc
 
-# Helpful TS aliases for bash (separate from zsh to avoid conflicts)
-RUN echo '# TypeScript development aliases' >> ${USER_HOME}/.bashrc && \
-    echo 'alias tsc="npx tsc"' >> ${USER_HOME}/.bashrc && \
-    echo 'alias tsx="npx tsx"' >> ${USER_HOME}/.bashrc && \
-    echo 'alias tsw="npx tsc-watch"' >> ${USER_HOME}/.bashrc && \
-    echo 'alias dev="npm run dev"' >> ${USER_HOME}/.bashrc && \
-    echo 'alias build="npm run build"' >> ${USER_HOME}/.bashrc && \
-    echo 'alias test="npm test"' >> ${USER_HOME}/.bashrc && \
-    echo 'alias lint="npm run lint"' >> ${USER_HOME}/.bashrc && \
-    echo 'alias format="npm run format"' >> ${USER_HOME}/.bashrc && \
-    echo '# Add npm completion if available' >> ${USER_HOME}/.bashrc && \
-    echo 'if command -v npm >/dev/null 2>&1; then eval "$(npm completion bash)"; fi' >> ${USER_HOME}/.bashrc
-
 # ------------------------------------------------------------------
 # Poetry installation (Dockerfile, not a feature)
 # ------------------------------------------------------------------
@@ -163,10 +147,3 @@ USER ${USERNAME}
 
 # Final setup
 WORKDIR /workspace
-# Use tini as PID 1 for proper signal handling and zombie reaping. Note that
-# devcontainer.json already sets "init": true, which makes VS Code add
-# --init (Docker's embedded tini). We vendor tini anyway so manual docker run
-# invocations without --init behave the same. Safe no-op duplication.
-ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
-# Keep container alive for VS Code to attach; shells are launched on demand.
-CMD ["sleep", "infinity"]

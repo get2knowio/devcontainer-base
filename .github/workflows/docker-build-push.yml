@@ -47,14 +47,28 @@ jobs:
             --image-name "$IMAGE_TAG"
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
-      - name: Test image
+      - name: Test image via DevContainer CLI (strict)
+        if: github.actor != 'nektos/act'
+        env:
+          STRICT_DEVCONTAINER: "true"
+          DEVCONTAINER_TESTS: "true"
         run: |
-          # Test the image for the current platform
           IMAGE_TAG="${{ env.IMAGE_NAME }}:ci-${{ github.sha }}"
-          echo "Testing image: $IMAGE_TAG"
-          
-          # Set the image for the test script
+          echo "Testing image (devcontainer strict mode): $IMAGE_TAG"
           export IMAGE="$IMAGE_TAG"
+          set -e
+          scripts/test.sh || { echo 'Devcontainer strict tests failed'; exit 1; }
+
+      - name: Test image (act fallback - docker mode)
+        if: github.actor == 'nektos/act'
+        env:
+            FORCE_DOCKER_TESTS: "true"
+            DEVCONTAINER_TESTS: "false"
+        run: |
+          IMAGE_TAG="${{ env.IMAGE_NAME }}:ci-${{ github.sha }}"
+          echo "Testing image in act fallback (docker mode): $IMAGE_TAG"
+          export IMAGE="$IMAGE_TAG"
+          set -e
           scripts/test.sh
 
       - name: Log in to Container Registry
