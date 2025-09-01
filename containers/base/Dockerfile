@@ -81,9 +81,10 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y && \
     echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc
 
 # Prepare for Node (nvm) in shell profiles
-RUN echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.zshrc && \
-    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'   >> ${USER_HOME}/.zshrc && \
-
+RUN echo 'export NVM_DIR="$HOME/.nvm"'                       >> ${USER_HOME}/.zshrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"' >> ${USER_HOME}/.zshrc && \
+    echo 'export NVM_DIR="$HOME/.nvm"'                       >> ${USER_HOME}/.bashrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"' >> ${USER_HOME}/.bashrc && \
     chown -R ${USERNAME}:${USERNAME} ${USER_HOME}
 
 # ------------------------------------------------------------------
@@ -147,3 +148,6 @@ USER ${USERNAME}
 
 # Final setup
 WORKDIR /workspace
+
+# Provide a long-lived default command suitable for devcontainer sessions and tests.
+CMD ["sleep", "infinity"]
