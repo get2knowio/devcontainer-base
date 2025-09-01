@@ -94,7 +94,7 @@ USER ${USERNAME}
 # Node.js LTS via nvm, then global tooling and AI CLIs
 RUN --mount=type=cache,target=/home/vscode/.cache,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/vscode/.npm,uid=1000,gid=1000 \
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | zsh && \
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash && \
     export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && \
     nvm install --lts && nvm alias default 'lts/*' && \
     if [ "${INSTALL_AI_CLIS}" = "true" ]; then npm install -g @google/gemini-cli @anthropic-ai/claude-code; fi && \
@@ -103,7 +103,7 @@ RUN --mount=type=cache,target=/home/vscode/.cache,uid=1000,gid=1000 \
     npm install -g vite esbuild prettier eslint @biomejs/biome tsc-watch
 
 # Install Bun (JavaScript runtime and package manager)
-RUN curl -fsSL https://bun.sh/install | zsh && \
+RUN curl -fsSL https://bun.sh/install | bash && \
     echo 'export PATH="$HOME/.bun/bin:$PATH"' >> ${USER_HOME}/.zshrc
 
 # Make Bun available system-wide by adding to PATH
