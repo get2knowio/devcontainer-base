@@ -31,7 +31,6 @@
         "terminal.integrated.defaultProfile.linux": "zsh"
       }
     }
-  }
-  // No postCreateCommand: validation handled in CI scripts/test.sh.
-  // Container keep-alive is provided by Dockerfile CMD (sleep infinity).
+  },
+  "postCreateCommand": "poetry --version && node --version && npm --version && (tsc --version || npx tsc --version)"
 }
