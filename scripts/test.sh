@@ -115,9 +115,9 @@ PY
     # Do not assert a specific init; just capture the PID1 executable name for sanity (docker-init, bash, sh acceptable) \
     pid1_exec=$(ps -p 1 -o comm=); \
     echo "pid1_exec: $pid1_exec"; \
-    # Accept a small, explicit set of PID1 executables. We intentionally run the container with CMD [\"sleep\", \"infinity\"]
+    # Accept a small, explicit set of PID1 executables. We intentionally run the container with CMD sleep infinity
     # to keep it alive for devcontainer lifecycle scripts and interactive attach flows. Historical transient failures
-    # occurred when the base image's default process exited too quickly, causing postCreate hooks to race.
+    # occurred when the base image default process exited too quickly, causing postCreate hooks to race.
     echo "$pid1_exec" | grep -E "docker-init|bash|sh|sleep" >/dev/null || { echo pid1-unexpected; exit 1; }; \
         id -u vscode >/dev/null || { echo missing-user; exit 1; }; \
         # Ensure poetry is on PATH for login shells

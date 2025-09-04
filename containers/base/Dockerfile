@@ -78,12 +78,18 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y && \
     echo 'eval "$(starship init zsh)"'                               >> ${USER_HOME}/.zshrc && \
     echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.zshrc && \
     echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.zshrc && \
-    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc
+    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc && \
+    echo 'eval "$(starship init bash)"'                              >> ${USER_HOME}/.bashrc && \
+    echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.bashrc && \
+    echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.bashrc && \
+    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.bashrc
 
 # Prepare for Node (nvm) in shell profiles
 RUN echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.zshrc && \
     echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'   >> ${USER_HOME}/.zshrc && \
-
+    echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.bashrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'   >> ${USER_HOME}/.bashrc && \
+    echo '[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"' >> ${USER_HOME}/.bashrc && \
     chown -R ${USERNAME}:${USERNAME} ${USER_HOME}
 
 # ------------------------------------------------------------------
