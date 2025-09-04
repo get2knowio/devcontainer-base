@@ -113,9 +113,12 @@ PY
         zsh -lc "echo zsh-login-ok" >/dev/null || { echo zsh-login-failed; exit 1; }; \
         bash -lc "echo bash-login-ok" >/dev/null || { echo bash-login-failed; exit 1; }; \
     # Do not assert a specific init; just capture the PID1 executable name for sanity (docker-init, bash, sh acceptable) \
-        pid1_exec=$(ps -p 1 -o comm=); \
-        echo "pid1_exec: $pid1_exec"; \
-        echo "$pid1_exec" | grep -E "docker-init|bash|sh" >/dev/null || { echo pid1-unexpected; exit 1; }; \
+    pid1_exec=$(ps -p 1 -o comm=); \
+    echo "pid1_exec: $pid1_exec"; \
+    # Accept a small, explicit set of PID1 executables. We intentionally run the container with CMD [\"sleep\", \"infinity\"]
+    # to keep it alive for devcontainer lifecycle scripts and interactive attach flows. Historical transient failures
+    # occurred when the base image's default process exited too quickly, causing postCreate hooks to race.
+    echo "$pid1_exec" | grep -E "docker-init|bash|sh|sleep" >/dev/null || { echo pid1-unexpected; exit 1; }; \
         id -u vscode >/dev/null || { echo missing-user; exit 1; }; \
         # Ensure poetry is on PATH for login shells
         zsh -lc "command -v poetry" >/dev/null || { echo poetry-missing-in-zsh; exit 1; }; \
@@ -303,7 +306,7 @@ test_poetry_functionality() {
     echo -e "${BLUE}📦 Poetry functionality test...${NC}"
     docker run --rm --privileged "$image_name" bash -c '
         set -e
-        su - vscode -c '
+        su - vscode -c '\''
             set -e
             cd /tmp
             echo "--- Testing Poetry Project Creation (as vscode) ---"
@@ -355,7 +358,7 @@ test_poetry_functionality() {
             poetry run python -c "import requests; print(\"✅ Poetry run works with installed packages\")" || { echo "❌ Poetry run failed"; exit 1; }
 
             echo "✅ Poetry functionality test completed"
-        '
+        '\''
     '
 }
 

@@ -110,6 +110,21 @@ See LICENSE file.
  
 ## 🔧 Troubleshooting
 
+### Why does the image use `CMD ["sleep", "infinity"]`?
+
+The container intentionally starts with a long‑running no‑op (`sleep infinity`) instead of the base image default process. This provides a stable, idle PID1 that:
+
+1. Prevents race conditions where the container would exit before Dev Container lifecycle hooks (e.g. `postCreateCommand`) could run.
+2. Ensures an attachable, ready environment for editors / tooling without needing a foreground app.
+3. Keeps test automation (devcontainer CLI + GitHub Actions) deterministic—PID1 is always present and lightweight.
+
+Operational notes:
+- Tests explicitly allow `sleep` as a valid PID1 (`docker-init|bash|sh|sleep`).
+- You still launch real workloads by opening shells (`bash` / `zsh`) or starting services manually.
+- Override the command for ad‑hoc runs if needed: `docker run --rm -it IMAGE bash`.
+
+If a future change introduces a supervising init (e.g. `tini`) or a daemon process, update the PID1 allowlist in `scripts/test.sh` accordingly.
+
 ### Docker-in-Docker Issues
 
 If you encounter issues with Docker-in-Docker feature installation during CI builds, the project includes several resilience improvements:
