@@ -12,8 +12,8 @@ This document contains instructions and conventions for GitHub Copilot when work
 - **Root Wrappers**: Create convenience wrapper files in the project root (without `.sh` extension) that execute the corresponding script in `scripts/`
 - **Wrapper Pattern**: Use this template for root wrapper files:
 
-```bash
-#!/bin/bash
+```zsh
+#!/usr/bin/env zsh
 # Convenience wrapper for scripts/<script-name>.sh
 exec "$(dirname "$0")/scripts/<script-name>.sh" "$@"
 ```
@@ -53,6 +53,22 @@ containers/
     Dockerfile                 # Core system setup and custom tools
 ```
 
+### Shell Support
+
+**Rule: Target zsh as the primary shell environment.**
+
+- **Primary Shell**: All shell-specific configurations, completions, and scripts should target zsh
+- **No Bash Support**: Don't worry about bash compatibility - focus solely on zsh functionality
+- **Configuration Files**: Use zsh-specific syntax and features in configuration files
+- **Completions**: Create zsh completions (`.zsh` files) instead of bash completions
+- **Shell Scripts**: While scripts should remain POSIX-compatible when possible, shell-specific features should use zsh syntax
+
+**Examples:**
+- Use `~/.zshrc` for shell configuration
+- Create `_command` completion files for zsh
+- Leverage zsh arrays, parameter expansion, and other zsh-specific features
+- Test scripts and configurations in zsh environment only
+
 ## File Naming Conventions
 
 - Shell scripts: Use `.sh` extension for actual scripts in `scripts/`
@@ -75,3 +91,31 @@ containers/
    - Modify Dockerfile in `containers/base/Dockerfile` for custom tools only
    - Use DevContainer features for language tools and standard services
    - Test with `./build` command
+
+## Testing Global npm-installed CLIs (nvm + zsh)
+
+Our Node toolchain is installed via `nvm` and activated in `~/.zshrc`. Non-interactive shells (e.g. `docker run ... zsh -lc`) do NOT source `~/.zshrc`, so global npm binaries (e.g. `codex`, `eslint`) may appear missing if you test incorrectly.
+
+Use one of these patterns:
+
+1. Recommended (interactive login + .zshrc):
+   ```bash
+   docker run -it --rm devcontainer-base:test zsh -lic 'which node && node -v && which codex'
+   ```
+2. Explicit nvm bootstrap (works for bash too):
+   ```bash
+   docker run --rm devcontainer-base:test bash -lc 'export NVM_DIR=$HOME/.nvm; . "$NVM_DIR/nvm.sh"; nvm use --silent default; which node; which codex'
+   ```
+3. One-off command without TTY (still need -i if using zsh):
+   ```bash
+   docker run --rm devcontainer-base:test zsh -lic 'codex --version'
+   ```
+
+Avoid:
+- `docker run --rm devcontainer-base:test zsh -lc 'which codex'` (misses `.zshrc` because shell is not interactive).
+
+Rule of thumb:
+- Include `-i` for zsh when you need environment from `.zshrc`.
+- Or source nvm manually inside the command.
+
+When writing automated tests/scripts, prefer the explicit bootstrap (option 2) for determinism.

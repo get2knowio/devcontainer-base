@@ -19,7 +19,9 @@
       "installDockerBuildx": true,
       "version": "latest",
       "dockerDashComposeVersion": "v2"
-    }
+    },
+    "ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {},
+    "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {}
   },
   "runArgs": ["--privileged"],
   "overrideCommand": false,

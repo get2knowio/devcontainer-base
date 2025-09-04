@@ -2,27 +2,77 @@
 
 Single multi-language development container with modern tooling for Python and TypeScript. One image. One workflow. Less maintenance.
 
-## 🚀 Quick start
-Build, test, run:
-```bash
-./build                 # Build (devcontainer-unified:latest)
-./test                  # Validate toolchain + DinD
-./build ghcr.io/you/img:dev   # Custom tag
-IMAGE=ghcr.io/you/img:dev ./test  # Test remote tag
-./run-local             # Run full workflow locally (single-job, local mode)
-./run-local --ci        # Force CI mode locally (multi-arch prep, tag steps)
+## 🧰 Tooling & Features Inventory
+Comprehensive list of what the image bakes in (multi-arch: linux/amd64 & linux/arm64). Items sourced either from the upstream base, devcontainer features, or the Dockerfile.
+
+Language & Runtimes:
+- Python 3.12 (base image) + `pip`, `venv`, `poetry` (installed globally; in-project virtualenvs enabled)
+- Node (via `nvm` LTS) + global package managers: `npm`, `pnpm`, `yarn`, `bun`
+- UV (Python package manager) via feature: `ghcr.io/jsburckhardt/devcontainer-features/uv:1`
+
+TypeScript / JS Toolchain (globally installed):
+- `typescript`, `ts-node`, `tsx`, `@types/node`, `nodemon`, `concurrently`, `vite`, `esbuild`, `prettier`, `eslint`, `@biomejs/biome`, `tsc-watch`
+
+AI / LLM CLIs:
+- `@google/gemini-cli`
+- `@anthropic-ai/claude-code`
+- `@openai/codex` (Codex CLI)
+
+Dev & CI Utilities:
+- Docker CLI (with in-container daemon from feature) + Buildx
+- AWS CLI (feature: `ghcr.io/devcontainers/features/aws-cli:1`)
+- `act` (GitHub Actions local runner)
+- `actionlint` (GitHub Actions workflow linter)
+- `ast-grep` + `sg` binaries (structural code search / rewriting)
+- `neovim` (apt)
+
+Modern Terminal UX:
+- `zsh` (default) + `starship` prompt
+- `eza` (ls replacement), `fzf`, `bat`, `ripgrep (rg)`, `fd`, `jq`
+
+Other Tools / Helpers:
+- `git` (up-to-date; may be source-built by base)
+- `curl`, `wget`, `unzip`, `ca-certificates` (bundled / apt)
+
+### Why include both `ast-grep` and `sg`?
+Some distributions provide a smaller `sg` wrapper binary. The image installs **both** to ensure parity with official docs and avoid unexpected tool differences.
+
+---
+
+## ⚡ Shell Aliases
+Convenience aliases injected into the default `zsh` environment (see Dockerfile). Use `which <name>` or `type <name>` to inspect. All are simple wrappers; adjust or extend in your own dotfiles as needed.
+
+File / Directory Listing:
+- `ls` → `eza --icons`
+- `ll` → `eza -l --icons`
+- `la` → `eza -la --icons`
+
+TypeScript / Node Workflow:
+- `tsc` → `npx tsc` (ensures local project version if present)
+- `tsx` → `npx tsx`
+- `tsw` → `npx tsc-watch`
+- `dev` → `npm run dev`
+- `build` → `npm run build`
+- `test` → `npm test`
+- `lint` → `npm run lint`
+- `format` → `npm run format`
+
+Notes:
+- Aliases prefer project-local binaries via `npx` when applicable.
+- Safe to override in your own `.zshrc` or extend with additional project automation.
+
+---
+
+## 📦 Example devcontainer.json
+```jsonc
+{
+   "image": "ghcr.io/your-org/devcontainer:latest",
+   "features": { "ghcr.io/devcontainers/features/docker-in-docker:2": {} },
+   "customizations": { "vscode": { "settings": { "terminal.integrated.defaultProfile.linux": "zsh" } } }
+}
 ```
 
-## 🔧 Stack
-Core:
-- Base: mcr.microsoft.com/devcontainers/python:3.12
-- Docker-in-Docker via devcontainer feature (ghcr.io/devcontainers/features/docker-in-docker:2)
-- Node (nvm LTS) + npm + yarn + pnpm + bun
-- TypeScript toolchain: typescript, ts-node, tsx, @types/node, nodemon, concurrently, vite, esbuild, prettier, eslint, @biomejs/biome, tsc-watch
-- Python: Poetry (Dockerfile install), venv-in-project support
-- AI CLIs: @google/gemini-cli, @anthropic-ai/claude-code
-- Modern CLIs: eza, fzf, bat, ripgrep, fd, jq
-- Shell: zsh + starship
+---
 
 ## 🏗️ Build variants
 Multi-arch and knobs via env vars:
@@ -32,148 +82,8 @@ NO_CACHE=true ./build                       # Fresh build
 PUSH=true IMAGE_TAG=ghcr.io/you/img:edge ./build
 ```
 
-## 🧪 Test coverage
-The test script asserts:
-- Node, npm, TypeScript compiler
-- Python + Poetry
-- Docker CLI (and optional DinD smoke)
-- Workspace write perms
-- Presence (if installed) of AI CLIs
-
-Skip DinD:
-```bash
-DIND_TESTS=false ./test
-```
-
-## 📁 Layout
-```
-containers/base/ (devcontainer.json + Dockerfile)
-scripts/build.sh  (devcontainer CLI build wrapper)
-scripts/test.sh   (image validation + DinD smoke)
-build / test      (thin wrappers)
-```
-
-## 🛠️ CI & Local Workflow
-Workflow: `.github/workflows/docker-build-push.yml`
-
-Single job; MODE is auto-detected:
-- `ci` when running in GitHub Actions (multi-arch build, login, metadata & promote)
-- `local-act` when run via `act` or plain local shell (single-arch build, no push, skips tag/promotion)
-
-Helpers:
-```bash
-./run-local          # Executes workflow via act (local mode)
-./run-local --ci     # act with MODE=ci (simulate CI path)
-MODE=ci ./ci-env     # Manually force before scripts
-```
-
-Core scripts (used by workflow & you directly):
-- `./ci-env` -> Detects MODE, writes `.ci-env.cache`
-- `./build-image` -> Build (multi-arch only in ci)
-- `./test-image` -> Run validation suite
-- `./promote-image` -> Tags & manifest creation (no-op in local mode)
-
-## 🧰 Usage patterns
-Python project:
-```bash
-poetry init  # then poetry install
-```
-TypeScript project:
-```bash
-npm init -y && npm install typescript
-npx tsc --init
-```
-
-## 🔐 Notes
-- User: vscode (sudo)
-- Multi-arch: linux/amd64, linux/arm64
-- Node installed in Dockerfile (needed for AI CLIs)
-- Local mode avoids QEMU + registry login for speed; force CI logic with `./run-local --ci`.
-
-## 🧹 Migration
-
-**v2.0 Unified Architecture:** Legacy separate `python/typescript/common` container configurations have been removed and replaced with a single unified container in `containers/base/`.
-
-**Key changes:**
-- ✅ **Single Container**: `containers/base/` replaces separate language containers
-- ✅ **Feature-Based**: Docker-in-Docker now uses devcontainer features instead of Dockerfile installs
-- ✅ **Simplified CI**: One image build instead of multiple container builds
-- ✅ **Registry**: Published to `ghcr.io/get2knowio/devcontainer:latest` (was `devcontainer-unified`)
-
-**Migration path:**
-- Update `.devcontainer/devcontainer.json` to reference: `ghcr.io/get2knowio/devcontainer:latest`
-- Remove any references to old image names (`devcontainer-python`, `devcontainer-typescript`)
-- All language tools (Python + TypeScript) are included in the unified image
+## � Further Reading / Contributing
+Looking for build internals, CI, migration history, troubleshooting, or how to extend the image? See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## 📄 License
 See LICENSE file.
- 
-## 🔧 Troubleshooting
-
-### Why does the image use `CMD ["sleep", "infinity"]`?
-
-The container intentionally starts with a long‑running no‑op (`sleep infinity`) instead of the base image default process. This provides a stable, idle PID1 that:
-
-1. Prevents race conditions where the container would exit before Dev Container lifecycle hooks (e.g. `postCreateCommand`) could run.
-2. Ensures an attachable, ready environment for editors / tooling without needing a foreground app.
-3. Keeps test automation (devcontainer CLI + GitHub Actions) deterministic—PID1 is always present and lightweight.
-
-Operational notes:
-- Tests explicitly allow `sleep` as a valid PID1 (`docker-init|bash|sh|sleep`).
-- You still launch real workloads by opening shells (`bash` / `zsh`) or starting services manually.
-- Override the command for ad‑hoc runs if needed: `docker run --rm -it IMAGE bash`.
-
-If a future change introduces a supervising init (e.g. `tini`) or a daemon process, update the PID1 allowlist in `scripts/test.sh` accordingly.
-
-### Docker-in-Docker Issues
-
-If you encounter issues with Docker-in-Docker feature installation during CI builds, the project includes several resilience improvements:
-
-#### Network Connectivity Issues
-If you see errors like:
-```
-OpenSSL SSL_connect: SSL_ERROR_SYSCALL in connection to packages.microsoft.com:443
-gpg: no valid OpenPGP data found.
-ERROR: Feature "Docker (Docker-in-Docker)" failed to install!
-```
-
-**Troubleshooting steps:**
-
-1. **Test connectivity locally:**
-   ```bash
-   ./test-docker-feature
-   ```
-
-2. **Check the CI warm-up step** in GitHub Actions logs - this pre-tests connectivity
-
-3. **Retry the workflow** - networking issues are often transient
-
-#### Configuration Improvements
-
-The project includes several improvements to handle networking issues:
-
-- **Docker-in-Docker Feature**: Uses specific version (`24.0`) instead of `latest` for stability
-- **APT Configuration**: Automatic retries (3x) and extended timeouts (60s) for package downloads
-- **Curl Settings**: Extended timeout settings for feature installations
-- **CI Environment Variables**: Network resilience settings for multi-arch builds
-
-#### Local Development
-
-For local development issues:
-
-```bash
-# Test the build locally
-./build typescript
-
-# Test with Docker feature specifically
-./test-docker-feature
-
-# Build without cache to ensure fresh installation
-NO_CACHE=true ./build typescript
-```
-
-### General DevContainer Issues
-
-- **VS Code Extension**: Ensure you have the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) installed
-- **Docker Requirements**: Docker Desktop must be running and accessible
-- **Memory Requirements**: Multi-arch builds require sufficient memory (recommend 4GB+ available)

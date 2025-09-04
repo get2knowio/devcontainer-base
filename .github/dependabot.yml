@@ -1,0 +1,83 @@
+version: 2
+
+# Dependabot configuration covering devcontainer features, Docker base image updates,
+# and (future) Node/npm dependencies if added.
+# See: https://docs.github.com/en/code-security/dependabot
+
+# Multi-ecosystem groups keep related infra updates in a single PR to cut noise.
+multi-ecosystem-groups:
+  dev-env:
+    # Weekly cadence is a good balance for infra/toolchain churn
+    schedule:
+      interval: weekly
+    # You can optionally constrain update times (e.g. day: monday, time: "05:00", timezone: "UTC")
+
+updates:
+  # 1. Dev Containers (devcontainer.json + Dockerfile FROM images + Feature version refs)
+  - package-ecosystem: devcontainers
+    directory: /containers/base
+    schedule:
+      interval: weekly
+    # Attach to multi-ecosystem group so Dockerfile + devcontainer changes land together
+    multi-ecosystem-group: dev-env
+    # Limit simultaneous noise
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(devcontainer)"
+    labels:
+      - dependencies
+      - devcontainer
+
+  # 2. Docker (direct FROM image tags inside Dockerfile)
+  - package-ecosystem: docker
+    directory: /containers/base
+    schedule:
+      interval: weekly
+    multi-ecosystem-group: dev-env
+    commit-message:
+      prefix: "chore(docker)"
+    labels:
+      - dependencies
+      - docker
+
+  # 3. GitHub Actions (if/when workflows added) – keep placeholder so team remembers to enable
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # Lower frequency; actions are usually less urgent than security vulns (alerts will still open PRs immediately)
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(actions)"
+    labels:
+      - dependencies
+      - ci
+
+  # 4. npm (future: if a package.json is added at repo root)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(npm)"
+      include: scope
+    # Group devDependencies separately (when present)
+    groups:
+      prod-deps:
+        dependency-type: production
+        patterns: ["*"]
+      dev-deps:
+        dependency-type: development
+        patterns: ["*"]
+    labels:
+      - dependencies
+      - javascript
+
+# Notes:
+# - "devcontainers" ecosystem lets Dependabot understand both the devcontainer.json Feature versions
+#   and embedded image references (including features specified with versions like ghcr.io/devcontainers/features/docker-in-docker:2).
+# - Docker ecosystem separately tracks the base image layers in the Dockerfile.
+# - Grouping (multi-ecosystem) reduces parallel PRs: one combined PR for devcontainers + docker updates.
+# - When Node or workflows are not present yet, Dependabot will just noop those entries until manifests appear.
+# - Adjust intervals (weekly/monthly) based on desired churn; add "day" & "time" for deterministic runs.

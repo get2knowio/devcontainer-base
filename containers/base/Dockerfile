@@ -35,6 +35,9 @@ ARG NVM_DIR=/home/vscode/.nvm
 ARG POETRY_VERSION=1.8.3
 ARG INSTALL_AI_CLIS=true
 ARG EZA_VERSION=0.23.0
+ARG ACT_VERSION=0.2.62
+ARG ACTIONLINT_VERSION=1.7.1
+ARG AST_GREP_VERSION=0.39.4
 ARG CURL_CONNECT_TIMEOUT=60
 ARG CURL_MAX_TIME=300
 ARG DEBIAN_FRONTEND=noninteractive
@@ -56,7 +59,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential bat ripgrep fd-find jq fzf curl ca-certificates \
-        python3-venv gnupg2 lsb-release && \
+        python3-venv gnupg2 lsb-release neovim unzip && \
     ln -sf /usr/bin/batcat /usr/bin/bat && \
     ln -sf /usr/bin/fdfind /usr/bin/fd && \
     ARCH=$(dpkg --print-architecture) && \
@@ -67,6 +70,36 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     esac && \
     EZA_TAR_URL="https://github.com/eza-community/eza/releases/download/v${EZA_VERSION}/eza_${EZA_ARCH}-unknown-linux-gnu.tar.gz" && \
     curl -fsSL "$EZA_TAR_URL" | tar -xzf - -C /usr/local/bin/ && \
+    echo "Installing act (GitHub Actions emulator) ${ACT_VERSION}" && \
+    case "$ARCH" in \
+        amd64) ACT_ARCH="x86_64" ;; \
+        arm64) ACT_ARCH="arm64" ;; \
+        *) echo "Unsupported architecture for act: $ARCH" && exit 1 ;; \
+    esac && \
+    ACT_URL="https://github.com/nektos/act/releases/download/v${ACT_VERSION}/act_Linux_${ACT_ARCH}.tar.gz" && \
+    curl -fsSL "$ACT_URL" | tar -xz -C /usr/local/bin act && \
+    chmod +x /usr/local/bin/act && \
+    echo "Installing actionlint ${ACTIONLINT_VERSION}" && \
+    case "$ARCH" in \
+        amd64) ACTIONLINT_ARCH="amd64" ;; \
+        arm64) ACTIONLINT_ARCH="arm64" ;; \
+        *) echo "Unsupported architecture for actionlint: $ARCH" && exit 1 ;; \
+    esac && \
+    ACTIONLINT_URL="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${ACTIONLINT_ARCH}.tar.gz" && \
+    curl -fsSL "$ACTIONLINT_URL" | tar -xz -C /usr/local/bin actionlint && \
+    chmod +x /usr/local/bin/actionlint && \
+    echo "Installing ast-grep ${AST_GREP_VERSION}" && \
+    case "$ARCH" in \
+        amd64) SG_ARCH="x86_64" ;; \
+        arm64) SG_ARCH="aarch64" ;; \
+        *) echo "Unsupported architecture for ast-grep: $ARCH" && exit 1 ;; \
+    esac && \
+    AST_GREP_URL="https://github.com/ast-grep/ast-grep/releases/download/${AST_GREP_VERSION}/app-${SG_ARCH}-unknown-linux-gnu.zip" && \
+    curl -fsSL "$AST_GREP_URL" -o /tmp/ast-grep.zip && \
+    unzip -q /tmp/ast-grep.zip -d /tmp/ast-grep && \
+    install /tmp/ast-grep/sg /usr/local/bin/sg && \
+    install /tmp/ast-grep/ast-grep /usr/local/bin/ast-grep || cp /tmp/ast-grep/sg /usr/local/bin/ast-grep && \
+    rm -rf /tmp/ast-grep /tmp/ast-grep.zip && \
     rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------------
@@ -78,18 +111,11 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y && \
     echo 'eval "$(starship init zsh)"'                               >> ${USER_HOME}/.zshrc && \
     echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.zshrc && \
     echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.zshrc && \
-    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc && \
-    echo 'eval "$(starship init bash)"'                              >> ${USER_HOME}/.bashrc && \
-    echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.bashrc && \
-    echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.bashrc && \
-    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.bashrc
+    echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc
 
-# Prepare for Node (nvm) in shell profiles
-RUN echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.zshrc && \
-    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'   >> ${USER_HOME}/.zshrc && \
-    echo 'export NVM_DIR="$HOME/.nvm"'                         >> ${USER_HOME}/.bashrc && \
-    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'   >> ${USER_HOME}/.bashrc && \
-    echo '[ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"' >> ${USER_HOME}/.bashrc && \
+# Basic nvm bootstrap (interactive shells will also run later 'nvm use')
+RUN echo 'export NVM_DIR="$HOME/.nvm"' >> ${USER_HOME}/.zshrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"' >> ${USER_HOME}/.zshrc && \
     chown -R ${USERNAME}:${USERNAME} ${USER_HOME}
 
 # ------------------------------------------------------------------
@@ -103,10 +129,13 @@ RUN --mount=type=cache,target=/home/vscode/.cache,uid=1000,gid=1000 \
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash && \
     export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && \
     nvm install --lts && nvm alias default 'lts/*' && \
-    if [ "${INSTALL_AI_CLIS}" = "true" ]; then npm install -g @google/gemini-cli @anthropic-ai/claude-code; fi && \
+    if [ "${INSTALL_AI_CLIS}" = "true" ]; then npm install -g @google/gemini-cli @anthropic-ai/claude-code @openai/codex; fi && \
     npm install -g pnpm yarn && \
     npm install -g typescript ts-node tsx @types/node nodemon concurrently && \
     npm install -g vite esbuild prettier eslint @biomejs/biome tsc-watch
+
+# Add silent nvm use to interactive shells
+RUN echo 'nvm use --silent default >/dev/null 2>&1 || nvm use --silent --lts >/dev/null 2>&1' >> ${USER_HOME}/.zshrc
 
 # Install Bun (JavaScript runtime and package manager)
 RUN curl -fsSL https://bun.sh/install | bash && \
