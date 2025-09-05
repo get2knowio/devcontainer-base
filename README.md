@@ -25,6 +25,8 @@ Dev & CI Utilities:
 - `actionlint` (GitHub Actions workflow linter)
 - `ast-grep` + `sg` binaries (structural code search / rewriting)
 - `neovim` (apt)
+- `gh` (GitHub CLI for PRs/issues/releases)
+- `lazygit` (terminal UI for advanced git workflows)
 
 Modern Terminal UX:
 - `zsh` (default) + `starship` prompt

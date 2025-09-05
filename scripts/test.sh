@@ -126,7 +126,7 @@ PY
         echo runtime-validation-complete'
 
     echo -e "${BLUE}▶ Modern CLI tools${NC}"
-    dc_exec 'set -e; for t in bat rg fd jq fzf eza starship make gcc aws tmux zellij zoxide; do command -v "$t" >/dev/null || { echo "$t missing"; exit 1; }; done'
+    dc_exec 'set -e; for t in bat rg fd jq fzf eza starship make gcc aws tmux zellij zoxide gh lazygit; do command -v "$t" >/dev/null || { echo "$t missing"; exit 1; }; done'
 
     echo -e "${BLUE}▶ zoxide initialization${NC}"
     dc_exec 'set -e; grep -q "zoxide init zsh" ~/.zshrc && echo zoxide-init-present || { echo zoxide-init-missing; exit 1; }'
@@ -206,6 +206,8 @@ PY
     command -v tmux >/dev/null 2>&1 && echo "✅ tmux: $(tmux -V)" || { echo "❌ tmux missing"; exit 1; }
     command -v zellij >/dev/null 2>&1 && echo "✅ zellij: $(zellij --version 2>&1 | head -1)" || { echo "❌ zellij missing"; exit 1; }
     command -v zoxide >/dev/null 2>&1 && echo "✅ zoxide: $(zoxide --version 2>&1 | head -1)" || { echo "❌ zoxide missing"; exit 1; }
+    command -v gh >/dev/null 2>&1 && echo "✅ gh: $(gh --version | head -1)" || { echo "❌ gh missing"; exit 1; }
+    command -v lazygit >/dev/null 2>&1 && echo "✅ lazygit: $(lazygit --version 2>&1 | head -1)" || { echo "❌ lazygit missing"; exit 1; }
         
         # Test Starship prompt
         command -v starship >/dev/null 2>&1 && echo "✅ starship: $(starship --version)" || { echo "❌ starship missing"; exit 1; }

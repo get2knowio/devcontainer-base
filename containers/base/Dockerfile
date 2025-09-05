@@ -39,6 +39,8 @@ ARG ACT_VERSION=0.2.62
 ARG ACTIONLINT_VERSION=1.7.1
 ARG AST_GREP_VERSION=0.39.4
 ARG ZELLIJ_VERSION=0.40.1
+ARG LAZYGIT_VERSION=0.54.2
+ARG GH_VERSION=2.78.0
 ARG CURL_CONNECT_TIMEOUT=60
 ARG CURL_MAX_TIME=300
 ARG DEBIAN_FRONTEND=noninteractive
@@ -113,6 +115,30 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     curl -fsSL "$ZELLIJ_URL" -o /tmp/zellij.tgz && \
     tar -xzf /tmp/zellij.tgz -C /usr/local/bin zellij && \
     rm -f /tmp/zellij.tgz && \
+    echo "Installing lazygit ${LAZYGIT_VERSION}" && \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+        amd64) LG_ARCH="x86_64" ;; \
+        arm64) LG_ARCH="arm64" ;; \
+        *) echo "Unsupported architecture for lazygit: $ARCH" && exit 1 ;; \
+    esac && \
+    LG_URL="https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${LG_ARCH}.tar.gz" && \
+    curl -fsSL "$LG_URL" -o /tmp/lazygit.tgz && \
+    tar -xzf /tmp/lazygit.tgz -C /tmp lazygit && \
+    install /tmp/lazygit /usr/local/bin/lazygit && \
+    rm -f /tmp/lazygit.tgz /tmp/lazygit && \
+    echo "Installing GitHub CLI gh ${GH_VERSION}" && \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+        amd64) GH_ARCH="amd64" ;; \
+        arm64) GH_ARCH="arm64" ;; \
+        *) echo "Unsupported architecture for gh: $ARCH" && exit 1 ;; \
+    esac && \
+    GH_URL="https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" && \
+    mkdir -p /tmp/gh && curl -fsSL "$GH_URL" -o /tmp/gh.tgz && \
+    tar -xzf /tmp/gh.tgz -C /tmp/gh && \
+    install /tmp/gh/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh && \
+    rm -rf /tmp/gh /tmp/gh.tgz && \
     # Ensure zoxide present (fallback if package absent or outdated)
     if ! command -v zoxide >/dev/null 2>&1; then \
         echo "Installing latest zoxide via upstream script"; \
