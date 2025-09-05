@@ -90,7 +90,33 @@ Notes:
 
 ---
 
-## � Further Reading / Contributing
+## 🚀 Quick Interactive Dev Container Shell
+
+An example helper script is provided at `examples/devcontainer-enter.sh` to drop you into an interactive `zsh` inside a Dev Container for the current directory.
+
+Usage:
+```
+./examples/devcontainer-enter.sh [id]
+```
+Where:
+- `id` (optional) adds a label `devcontainer-example.id=<id>` so multiple sessions can coexist or be targeted.
+
+Behavior:
+- If a matching container is running (workspace + optional id) it just opens `zsh`.
+- If a stopped matching container exists, it starts it, then opens `zsh`.
+- If none exists, it performs `devcontainer up` to create one.
+- On shell exit: if the script created the container this session, it stops (does not remove) the container for fast reuse; otherwise leaves it as-is.
+
+Requirements:
+- `devcontainer` CLI on PATH
+- Docker daemon available
+- `.devcontainer/` directory present in the workspace
+
+This offers a repeatable "jump in / jump out" workflow that preserves the container (stopped) for rapid restart while avoiding resource use when idle.
+
+---
+
+## 📚 Further Reading / Contributing
 Looking for build internals, CI, migration history, troubleshooting, or how to extend the image? See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## 📄 License
