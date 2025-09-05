@@ -126,7 +126,10 @@ PY
         echo runtime-validation-complete'
 
     echo -e "${BLUE}▶ Modern CLI tools${NC}"
-    dc_exec 'set -e; for t in bat rg fd jq fzf eza starship make gcc aws; do command -v "$t" >/dev/null || { echo "$t missing"; exit 1; }; done'
+    dc_exec 'set -e; for t in bat rg fd jq fzf eza starship make gcc aws tmux zellij zoxide; do command -v "$t" >/dev/null || { echo "$t missing"; exit 1; }; done'
+
+    echo -e "${BLUE}▶ zoxide initialization${NC}"
+    dc_exec 'set -e; grep -q "zoxide init zsh" ~/.zshrc && echo zoxide-init-present || { echo zoxide-init-missing; exit 1; }'
 
     echo -e "${BLUE}▶ Workspace write check${NC}"
     dc_exec 'set -e; touch /workspace/.wtest && rm /workspace/.wtest'
@@ -199,7 +202,10 @@ PY
         command -v fd >/dev/null 2>&1 && echo "✅ fd: $(fd --version)" || { echo "❌ fd-find missing"; exit 1; }
         command -v jq >/dev/null 2>&1 && echo "✅ jq: $(jq --version)" || { echo "❌ jq missing"; exit 1; }
         command -v fzf >/dev/null 2>&1 && echo "✅ fzf: $(fzf --version)" || { echo "❌ fzf missing"; exit 1; }
-        command -v eza >/dev/null 2>&1 && echo "✅ eza: $(eza --version | head -1)" || { echo "❌ eza missing"; exit 1; }
+    command -v eza >/dev/null 2>&1 && echo "✅ eza: $(eza --version | head -1)" || { echo "❌ eza missing"; exit 1; }
+    command -v tmux >/dev/null 2>&1 && echo "✅ tmux: $(tmux -V)" || { echo "❌ tmux missing"; exit 1; }
+    command -v zellij >/dev/null 2>&1 && echo "✅ zellij: $(zellij --version 2>&1 | head -1)" || { echo "❌ zellij missing"; exit 1; }
+    command -v zoxide >/dev/null 2>&1 && echo "✅ zoxide: $(zoxide --version 2>&1 | head -1)" || { echo "❌ zoxide missing"; exit 1; }
         
         # Test Starship prompt
         command -v starship >/dev/null 2>&1 && echo "✅ starship: $(starship --version)" || { echo "❌ starship missing"; exit 1; }
@@ -267,12 +273,15 @@ PY
         # Test shell configurations and aliases
         echo "--- Shell Configuration ---"
         su - vscode -c '\''
-            # Test starship in shell config
+            # Test starship & zoxide in shell config
             grep -q "starship init" ~/.zshrc && echo "✅ Starship configured in zsh" || echo "⚠️ Starship not found in zsh config"
             grep -q "starship init" ~/.bashrc && echo "✅ Starship configured in bash" || echo "⚠️ Starship not found in bash config"
+            grep -q "zoxide init zsh" ~/.zshrc && echo "✅ zoxide init present" || echo "❌ zoxide init missing"
             
-            # Test eza aliases
+            # Test eza aliases & zoxide presence
             grep -q "alias ls.*eza" ~/.zshrc && echo "✅ eza aliases configured" || echo "⚠️ eza aliases not found"
+            command -v zoxide >/dev/null 2>&1 && echo "✅ zoxide installed" || echo "❌ zoxide missing"
+            grep -q "zoxide init zsh" ~/.zshrc && echo "✅ zoxide init present" || echo "❌ zoxide init missing"
             
             # Test NVM configuration
             grep -q "NVM_DIR" ~/.zshrc && echo "✅ NVM configured in zsh" || echo "⚠️ NVM not configured in zsh"

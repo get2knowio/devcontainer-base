@@ -59,7 +59,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential bat ripgrep fd-find jq fzf curl ca-certificates \
-        python3-venv gnupg2 lsb-release neovim unzip && \
+        python3-venv gnupg2 lsb-release neovim unzip tmux zoxide zellij && \
     ln -sf /usr/bin/batcat /usr/bin/bat && \
     ln -sf /usr/bin/fdfind /usr/bin/fd && \
     ARCH=$(dpkg --print-architecture) && \
@@ -109,6 +109,8 @@ RUN curl -sS https://starship.rs/install.sh | sh -s -- -y && \
     mkdir -p ${USER_HOME}/.config && \
     printf 'command_timeout = 2000\n[container]\ndisabled = true\n[docker_context]\ndisabled = true\n' > ${USER_HOME}/.config/starship.toml && \
     echo 'eval "$(starship init zsh)"'                               >> ${USER_HOME}/.zshrc && \
+    echo '# zoxide (smart cd) init'                                    >> ${USER_HOME}/.zshrc && \
+    echo 'eval "$(zoxide init zsh)"'                                 >> ${USER_HOME}/.zshrc && \
     echo 'alias ls="eza --icons"'                                    >> ${USER_HOME}/.zshrc && \
     echo 'alias ll="eza -l --icons"'                                 >> ${USER_HOME}/.zshrc && \
     echo 'alias la="eza -la --icons"'                                >> ${USER_HOME}/.zshrc

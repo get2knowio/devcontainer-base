@@ -1,4 +1,4 @@
-# Unified DevContainer Base (Python + TypeScript)
+# get2know.io DevContainer
 
 Single multi-language development container with modern tooling for Python and TypeScript. One image. One workflow. Less maintenance.
 
@@ -28,6 +28,8 @@ Dev & CI Utilities:
 
 Modern Terminal UX:
 - `zsh` (default) + `starship` prompt
+- Terminal multiplexers: `tmux`, `zellij`
+- Smart directory jumper: `zoxide`
 - `eza` (ls replacement), `fzf`, `bat`, `ripgrep (rg)`, `fd`, `jq`
 
 Other Tools / Helpers:
@@ -66,21 +68,25 @@ Notes:
 ## 📦 Example devcontainer.json
 ```jsonc
 {
-   "image": "ghcr.io/your-org/devcontainer:latest",
-   "features": { "ghcr.io/devcontainers/features/docker-in-docker:2": {} },
-   "customizations": { "vscode": { "settings": { "terminal.integrated.defaultProfile.linux": "zsh" } } }
+  "name": "get2know.io devcontainer",
+  "image": "ghcr.io/get2knowio/devcontainer:latest",
+  "remoteUser": "vscode",
+  "features": {},
+//   "postCreateCommand": "npm install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-typescript-next",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  },
+  "initializeCommand": "docker pull ghcr.io/get2knowio/devcontainer:latest"
 }
 ```
 
 ---
-
-## 🏗️ Build variants
-Multi-arch and knobs via env vars:
-```bash
-PLATFORM=linux/arm64 ./build                # Alt arch
-NO_CACHE=true ./build                       # Fresh build
-PUSH=true IMAGE_TAG=ghcr.io/you/img:edge ./build
-```
 
 ## � Further Reading / Contributing
 Looking for build internals, CI, migration history, troubleshooting, or how to extend the image? See [`CONTRIBUTING.md`](CONTRIBUTING.md).
