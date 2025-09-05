@@ -34,6 +34,7 @@ ARG NVM_VERSION=0.40.3
 ARG NVM_DIR=/home/vscode/.nvm
 ARG POETRY_VERSION=1.8.3
 ARG INSTALL_AI_CLIS=true
+ARG UPDATE_NPM=true
 ARG EZA_VERSION=0.23.0
 ARG ACT_VERSION=0.2.62
 ARG ACTIONLINT_VERSION=1.7.1
@@ -174,6 +175,7 @@ RUN --mount=type=cache,target=/home/vscode/.cache,uid=1000,gid=1000 \
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash && \
     export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && \
     nvm install --lts && nvm alias default 'lts/*' && \
+    if [ "${UPDATE_NPM}" = "true" ]; then echo "Updating npm to latest"; npm install -g npm@latest; fi && \
     if [ "${INSTALL_AI_CLIS}" = "true" ]; then npm install -g @google/gemini-cli @anthropic-ai/claude-code @openai/codex; fi && \
     npm install -g pnpm yarn && \
     npm install -g typescript ts-node tsx @types/node nodemon concurrently && \
