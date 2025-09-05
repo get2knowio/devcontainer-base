@@ -38,6 +38,7 @@ ARG EZA_VERSION=0.23.0
 ARG ACT_VERSION=0.2.62
 ARG ACTIONLINT_VERSION=1.7.1
 ARG AST_GREP_VERSION=0.39.4
+ARG ZELLIJ_VERSION=0.40.1
 ARG CURL_CONNECT_TIMEOUT=60
 ARG CURL_MAX_TIME=300
 ARG DEBIAN_FRONTEND=noninteractive
@@ -59,7 +60,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential bat ripgrep fd-find jq fzf curl ca-certificates \
-        python3-venv gnupg2 lsb-release neovim unzip tmux zoxide zellij && \
+        python3-venv gnupg2 lsb-release neovim unzip tmux zoxide && \
     ln -sf /usr/bin/batcat /usr/bin/bat && \
     ln -sf /usr/bin/fdfind /usr/bin/fd && \
     ARCH=$(dpkg --print-architecture) && \
@@ -100,7 +101,23 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     install /tmp/ast-grep/sg /usr/local/bin/sg && \
     install /tmp/ast-grep/ast-grep /usr/local/bin/ast-grep || cp /tmp/ast-grep/sg /usr/local/bin/ast-grep && \
     rm -rf /tmp/ast-grep /tmp/ast-grep.zip && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    echo "Installing zellij ${ZELLIJ_VERSION}" && \
+    ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+        amd64) ZELLIJ_ARCH="x86_64" ;; \
+        arm64) ZELLIJ_ARCH="aarch64" ;; \
+        *) echo "Unsupported architecture for zellij: $ARCH" && exit 1 ;; \
+    esac && \
+    ZELLIJ_URL="https://github.com/zellij-org/zellij/releases/download/v${ZELLIJ_VERSION}/zellij-${ZELLIJ_ARCH}-unknown-linux-musl.tar.gz" && \
+    curl -fsSL "$ZELLIJ_URL" -o /tmp/zellij.tgz && \
+    tar -xzf /tmp/zellij.tgz -C /usr/local/bin zellij && \
+    rm -f /tmp/zellij.tgz && \
+    # Ensure zoxide present (fallback if package absent or outdated)
+    if ! command -v zoxide >/dev/null 2>&1; then \
+        echo "Installing latest zoxide via upstream script"; \
+        curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash -s -- -b /usr/local/bin; \
+    fi
 
 # ------------------------------------------------------------------
 # Starship prompt and shell enhancements

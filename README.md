@@ -28,7 +28,7 @@ Dev & CI Utilities:
 
 Modern Terminal UX:
 - `zsh` (default) + `starship` prompt
-- Terminal multiplexers: `tmux`, `zellij`
+- Terminal multiplexers: `tmux`, `zellij` (zellij fetched from GitHub release for amd64/arm64)
 - Smart directory jumper: `zoxide`
 - `eza` (ls replacement), `fzf`, `bat`, `ripgrep (rg)`, `fd`, `jq`
 
