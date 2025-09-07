@@ -7,10 +7,11 @@ version: 2
 # Multi-ecosystem groups keep related infra updates in a single PR to cut noise.
 multi-ecosystem-groups:
   dev-env:
-    # Weekly cadence is a good balance for infra/toolchain churn
-    schedule:
-      interval: weekly
-    # You can optionally constrain update times (e.g. day: monday, time: "05:00", timezone: "UTC")
+    # Define patterns that group related infra tool updates across ecosystems.
+    # These patterns must match dependency names; broad wildcard keeps them unified.
+    patterns:
+      - "*"
+    # (Scheduling is controlled per-update entry; group-level schedule is not supported.)
 
 updates:
   # 1. Dev Containers (devcontainer.json + Dockerfile FROM images + Feature version refs)
