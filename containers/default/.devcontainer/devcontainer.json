@@ -1,7 +1,7 @@
 {
   // Canonical devcontainer.json lives under .devcontainer/ to satisfy devcontainers/ci and CLI expectations.
   // Dockerfile stays one directory up to keep it adjacent to related build assets.
-  "name": "Unified DevContainer (Python + TypeScript)",
+  "name": "Unified DevContainer (Python + TypeScript + Rust)",
   "build": {
     "dockerfile": "../Dockerfile",
     "context": "..",
@@ -20,6 +20,11 @@
       "version": "latest",
       "dockerDashComposeVersion": "v2"
     },
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest",
+      "profile": "default",
+      "components": "rust-analyzer,rust-src,rustfmt,clippy"
+    },
     "ghcr.io/eitsupi/devcontainer-features/jq-likes:2": {},
     "ghcr.io/jsburckhardt/devcontainer-features/uv:1": {}
   },
@@ -36,5 +41,5 @@
       }
     }
   },
-  "postCreateCommand": "poetry --version && node --version && npm --version && (tsc --version || npx tsc --version)"
+  "postCreateCommand": "poetry --version && node --version && npm --version && (tsc --version || npx tsc --version) && rustc --version && cargo --version"
 }

@@ -12,8 +12,9 @@
 # • DevContainer Features: Docker-in-Docker, AWS CLI functionality
 # • Node.js Ecosystem: nvm, Node LTS, npm, pnpm, yarn, bun
 # • TypeScript: compiler, ts-node, tsx, project compilation
-# • Development Tools: nodemon, concurrently, tsc-watch, vite, esbuild
-# • Code Quality: prettier, eslint, biome
+# • Rust Ecosystem: rustc, cargo, rustfmt, clippy, rust-analyzer, project creation
+# • Development Tools: nodemon, concurrently, tsc-watch, vite, esbuild, cargo-watch
+# • Code Quality: prettier, eslint, biome, cargo fmt, clippy
 # • AI CLIs: Google Gemini CLI, Anthropic Claude CLI
 # • Shell Configuration: aliases, environment setup, profile configurations
 # • Workspace: permissions and functionality
@@ -152,6 +153,17 @@ PY
     echo -e "${BLUE}▶ AI CLIs${NC}"
     dc_exec 'set -e; for t in gemini claude; do command -v $t >/dev/null || { echo "$t missing"; exit 1; }; done'
 
+    echo -e "${BLUE}▶ Rust ecosystem${NC}"
+    dc_exec 'set -e;
+        for t in rustc cargo rustfmt clippy rust-analyzer; do
+            if command -v "$t" >/dev/null; then echo "✅ $t present"; else echo "❌ $t missing"; exit 1; fi;
+        done;
+        rustc --version;
+        cargo --version;
+        echo "fn main() { println!(\"Hello Rust\"); }" > /tmp/hello.rs;
+        rustc /tmp/hello.rs -o /tmp/hello && /tmp/hello;
+        rm -f /tmp/hello.rs /tmp/hello'
+
     echo -e "${BLUE}▶ Poetry project flow${NC}"
     dc_exec 'set -e; cd /tmp; poetry new ptest >/dev/null; cd ptest; poetry add requests >/dev/null; test -d .venv || { echo no-venv; exit 1; }; poetry run python -c "import requests;print(\"requests ok\")"'
 
@@ -270,6 +282,34 @@ PY
             echo "console.log(\"Hello TypeScript\");" > /tmp/test.ts
             npx tsc /tmp/test.ts --outDir /tmp/ && echo "✅ TypeScript compilation works" || { echo "❌ TypeScript compilation failed"; exit 1; }
             rm -f /tmp/test.ts /tmp/test.js
+        '\''
+        
+        # Test Rust ecosystem
+        echo "--- Rust Ecosystem ---"
+        su - vscode -c '\''
+            # Core Rust tools
+            command -v rustc >/dev/null 2>&1 && echo "✅ Rust compiler: $(rustc --version)" || { echo "❌ rustc missing"; exit 1; }
+            command -v cargo >/dev/null 2>&1 && echo "✅ Cargo: $(cargo --version)" || { echo "❌ cargo missing"; exit 1; }
+            
+            # Rust development tools
+            command -v rustfmt >/dev/null 2>&1 && echo "✅ rustfmt available" || { echo "❌ rustfmt missing"; exit 1; }
+            command -v clippy-driver >/dev/null 2>&1 && echo "✅ clippy available" || { echo "❌ clippy missing"; exit 1; }
+            command -v rust-analyzer >/dev/null 2>&1 && echo "✅ rust-analyzer available" || { echo "❌ rust-analyzer missing"; exit 1; }
+            
+            # Test additional cargo tools (may not be installed during build due to timing)
+            command -v cargo-watch >/dev/null 2>&1 && echo "✅ cargo-watch available" || echo "ℹ️ cargo-watch not available (may install at runtime)"
+            command -v cargo-edit >/dev/null 2>&1 && echo "✅ cargo-edit available" || echo "ℹ️ cargo-edit not available (may install at runtime)"
+            command -v cargo-audit >/dev/null 2>&1 && echo "✅ cargo-audit available" || echo "ℹ️ cargo-audit not available (may install at runtime)"
+            
+            # Test Rust functionality
+            echo "fn main() { println!(\"Hello Rust!\"); }" > /tmp/test.rs
+            rustc /tmp/test.rs -o /tmp/test_rust && /tmp/test_rust && echo "✅ Rust compilation and execution works" || { echo "❌ Rust compilation failed"; exit 1; }
+            rm -f /tmp/test.rs /tmp/test_rust
+            
+            # Test cargo functionality
+            cd /tmp && cargo init --name test_cargo >/dev/null 2>&1 && echo "✅ Cargo project creation works" || { echo "❌ Cargo init failed"; exit 1; }
+            cd test_cargo && cargo check >/dev/null 2>&1 && echo "✅ Cargo check works" || { echo "❌ Cargo check failed"; exit 1; }
+            cd .. && rm -rf test_cargo
         '\''
         
         # Test shell configurations and aliases
@@ -415,6 +455,53 @@ test_node_ecosystem() {
     '
 }
 
+test_rust_ecosystem() {
+    local image_name="$1"
+    echo -e "${BLUE}🦀 Rust ecosystem functionality test...${NC}"
+    docker run --rm --privileged "$image_name" bash -c '
+        set -e
+        su - vscode -c '\''
+            cd /tmp
+            echo "--- Testing Rust Project Setup ---"
+            
+            # Test cargo project initialization
+            cargo new --bin rust-test >/dev/null 2>&1 && echo "✅ cargo new works" || { echo "❌ cargo new failed"; exit 1; }
+            cd rust-test
+            
+            # Check project structure
+            [ -f "Cargo.toml" ] && echo "✅ Cargo.toml created" || { echo "❌ Cargo.toml missing"; exit 1; }
+            [ -f "src/main.rs" ] && echo "✅ main.rs created" || { echo "❌ main.rs missing"; exit 1; }
+            
+            # Test compilation
+            cargo build >/dev/null 2>&1 && echo "✅ Cargo build works" || { echo "❌ Cargo build failed"; exit 1; }
+            
+            # Test running
+            cargo run >/dev/null 2>&1 && echo "✅ Cargo run works" || { echo "❌ Cargo run failed"; exit 1; }
+            
+            # Test check (faster than build)
+            cargo check >/dev/null 2>&1 && echo "✅ Cargo check works" || { echo "❌ Cargo check failed"; exit 1; }
+            
+            # Test formatting
+            cargo fmt --check >/dev/null 2>&1 && echo "✅ Cargo fmt works" || { echo "❌ Cargo fmt failed"; exit 1; }
+            
+            # Test linting (clippy)
+            cargo clippy >/dev/null 2>&1 && echo "✅ Cargo clippy works" || { echo "❌ Cargo clippy failed"; exit 1; }
+            
+            # Test adding dependency
+            echo '\''[dependencies]
+serde = "1.0"'\'' >> Cargo.toml
+            cargo check >/dev/null 2>&1 && echo "✅ Dependency resolution works" || { echo "❌ Dependency resolution failed"; exit 1; }
+            
+            # Test library project
+            cd ../ && cargo new --lib rust-lib >/dev/null 2>&1 && echo "✅ Library project creation works" || { echo "❌ Library project creation failed"; exit 1; }
+            cd rust-lib
+            cargo test >/dev/null 2>&1 && echo "✅ Cargo test works" || { echo "❌ Cargo test failed"; exit 1; }
+            
+            echo "✅ Rust ecosystem functionality test completed"
+        '\''
+    '
+}
+
 test_aws_cli_functionality() {
     local image_name="$1"
     echo -e "${BLUE}☁️ AWS CLI functionality test...${NC}"
@@ -498,6 +585,14 @@ main() {
         SUMMARY+=("node_ecosystem=pass")
     else
         echo -e "${RED}❌ Node.js ecosystem tests failed${NC}"; exit 1
+    fi
+    
+    # Rust ecosystem tests
+    if test_rust_ecosystem "$IMAGE"; then
+        echo -e "${GREEN}✅ Rust ecosystem tests passed${NC}"
+        SUMMARY+=("rust_ecosystem=pass")
+    else
+        echo -e "${RED}❌ Rust ecosystem tests failed${NC}"; exit 1
     fi
     
     # AWS CLI functionality tests

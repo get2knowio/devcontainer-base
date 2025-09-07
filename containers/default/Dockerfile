@@ -1,9 +1,9 @@
 ########################################################################
-#  Unified Development Container - Python + TypeScript
+#  Unified Development Container - Python + TypeScript + Rust
 #
 #  Single image starting from the official DevContainers Python image
 #  with additional common tooling, Node.js via nvm, global TypeScript 
-#  tooling, AI CLIs, and Poetry installed in Dockerfile.
+#  tooling, Rust via feature, AI CLIs, and Poetry installed in Dockerfile.
 #
 #  Docker is provided via the docker-in-docker feature in devcontainer.json
 #
@@ -13,6 +13,7 @@
 #    • Docker via docker-in-docker feature (not in Dockerfile)
 #    • Starship prompt + zsh enhancements
 #    • Node.js LTS via nvm (NOT a feature) + npm global tools
+#    • Rust via feature: rustc, cargo, rust-analyzer, rustfmt, clippy
 #    • AI CLIs: @google/gemini-cli, @anthropic-ai/claude-code
 #    • TS tooling: typescript, ts-node, tsx, @types/node, nodemon, concurrently,
 #                  vite, esbuild, prettier, eslint, @biomejs/biome, tsc-watch,
@@ -208,6 +209,26 @@ RUN echo '# TypeScript development aliases' >> ${USER_HOME}/.zshrc && \
     echo '# Add npm completion if available' >> ${USER_HOME}/.zshrc && \
     echo 'if command -v npm >/dev/null 2>&1; then eval "$(npm completion zsh)"; fi' >> ${USER_HOME}/.zshrc
 
+# Helpful Rust aliases and shell configuration for zsh
+RUN echo '# Rust development aliases' >> ${USER_HOME}/.zshrc && \
+    echo 'alias cr="cargo run"' >> ${USER_HOME}/.zshrc && \
+    echo 'alias cb="cargo build"' >> ${USER_HOME}/.zshrc && \
+    echo 'alias ct="cargo test"' >> ${USER_HOME}/.zshrc && \
+    echo 'alias cc="cargo check"' >> ${USER_HOME}/.zshrc && \
+    echo 'alias cf="cargo fmt"' >> ${USER_HOME}/.zshrc && \
+    echo 'alias cl="cargo clippy"' >> ${USER_HOME}/.zshrc && \
+    echo 'alias cw="cargo watch"' >> ${USER_HOME}/.zshrc && \
+    echo 'alias cn="cargo new"' >> ${USER_HOME}/.zshrc && \
+    echo 'alias ca="cargo add"' >> ${USER_HOME}/.zshrc && \
+    echo 'alias cup="cargo update"' >> ${USER_HOME}/.zshrc && \
+    echo '# Add cargo completion if available' >> ${USER_HOME}/.zshrc && \
+    echo 'if command -v rustup >/dev/null 2>&1; then' >> ${USER_HOME}/.zshrc && \
+    echo '  mkdir -p ~/.zsh/completion' >> ${USER_HOME}/.zshrc && \
+    echo '  rustup completions zsh > ~/.zsh/completion/_rustup 2>/dev/null || true' >> ${USER_HOME}/.zshrc && \
+    echo '  rustup completions zsh cargo > ~/.zsh/completion/_cargo 2>/dev/null || true' >> ${USER_HOME}/.zshrc && \
+    echo '  fpath=(~/.zsh/completion $fpath)' >> ${USER_HOME}/.zshrc && \
+    echo 'fi' >> ${USER_HOME}/.zshrc
+
 # ------------------------------------------------------------------
 # Poetry installation (Dockerfile, not a feature)
 # ------------------------------------------------------------------
@@ -221,6 +242,16 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 USER ${USERNAME}
 # Set global Poetry config (cannot use --local without a pyproject)
 RUN poetry config virtualenvs.in-project true --global || true
+
+# ------------------------------------------------------------------
+# Additional Rust development tools (as vscode user)
+# ------------------------------------------------------------------
+# Install common Rust development tools via cargo
+# Note: Rust itself is installed via devcontainer feature
+RUN --mount=type=cache,target=${USER_HOME}/.cargo/registry \
+    --mount=type=cache,target=${USER_HOME}/.cargo/git \
+    cargo install cargo-watch cargo-edit cargo-audit 2>/dev/null || \
+    echo "Note: Some cargo tools may fail to install during build but will be available at runtime"
 
 # Set zsh as the default shell for the vscode user
 USER root

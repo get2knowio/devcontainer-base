@@ -1,6 +1,6 @@
 # get2know.io DevContainer
 
-Single multi-language development container with modern tooling for Python and TypeScript. One image. One workflow. Less maintenance.
+Single multi-language development container with modern tooling for Python, TypeScript, and Rust. One image. One workflow. Less maintenance.
 
 ## 🧰 Tooling & Features Inventory
 Comprehensive list of what the image bakes in (multi-arch: linux/amd64 & linux/arm64). Items sourced either from the upstream base, devcontainer features, or the Dockerfile.
@@ -8,10 +8,20 @@ Comprehensive list of what the image bakes in (multi-arch: linux/amd64 & linux/a
 Language & Runtimes:
 - Python 3.12 (base image) + `pip`, `venv`, `poetry` (installed globally; in-project virtualenvs enabled)
 - Node (via `nvm` LTS) + global package managers: `npm`, `pnpm`, `yarn`, `bun`
+- Rust (via feature: `ghcr.io/devcontainers/features/rust:1`) + `rustc`, `cargo`, `rust-analyzer`, `rustfmt`, `clippy`
 - UV (Python package manager) via feature: `ghcr.io/jsburckhardt/devcontainer-features/uv:1`
 
 TypeScript / JS Toolchain (globally installed):
 - `typescript`, `ts-node`, `tsx`, `@types/node`, `nodemon`, `concurrently`, `vite`, `esbuild`, `prettier`, `eslint`, `@biomejs/biome`, `tsc-watch`
+
+Rust Toolchain:
+- `rustc`, `cargo` (compiler and package manager)
+- `rust-analyzer` (language server for IDE support)
+- `rustfmt` (code formatter)
+- `clippy` (linter for better Rust code)
+- `cargo-watch` (automatically run commands on file changes)
+- `cargo-edit` (manage dependencies from command line)
+- `cargo-audit` (security vulnerability scanner)
 
 AI / LLM CLIs:
 - `@google/gemini-cli`
@@ -60,6 +70,18 @@ TypeScript / Node Workflow:
 - `test` → `npm test`
 - `lint` → `npm run lint`
 - `format` → `npm run format`
+
+Rust Workflow:
+- `cr` → `cargo run`
+- `cb` → `cargo build`
+- `ct` → `cargo test`
+- `cc` → `cargo check`
+- `cf` → `cargo fmt`
+- `cl` → `cargo clippy`
+- `cw` → `cargo watch`
+- `cn` → `cargo new`
+- `ca` → `cargo add`
+- `cup` → `cargo update`
 
 Notes:
 - Aliases prefer project-local binaries via `npx` when applicable.
