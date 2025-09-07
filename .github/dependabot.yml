@@ -10,6 +10,11 @@ multi-ecosystem-groups:
     # Group schedule (applies to combined PR cadence)
     schedule:
       interval: weekly
+    # Shared commit message prefix for grouped multi-ecosystem updates
+    commit-message:
+      prefix: "chore(dev-env)"
+    # Shared limit for combined PRs across grouped ecosystems
+    open-pull-requests-limit: 5
 
 updates:
   # 1. Dev Containers (devcontainer.json + Dockerfile FROM images + Feature version refs)
@@ -21,10 +26,6 @@ updates:
     multi-ecosystem-group: dev-env
     # Required when using multi-ecosystem-group: list dependency name patterns to include
     patterns: ["*"]
-    # Limit simultaneous noise
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(devcontainer)"
     labels:
       - dependencies
       - devcontainer
@@ -36,8 +37,6 @@ updates:
       interval: weekly
     multi-ecosystem-group: dev-env
     patterns: ["*"]
-    commit-message:
-      prefix: "chore(docker)"
     labels:
       - dependencies
       - docker
