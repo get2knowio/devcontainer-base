@@ -18,11 +18,11 @@ This document explains how the unified devcontainer image is structured, built, 
 ---
 ## Overview
 Source lives under `containers/default/`:
-- `Dockerfile` – installs system tooling, Node via nvm, global TS/AI CLIs, poetry, aliases
-- `.devcontainer/devcontainer.json` – adds features (docker-in-docker, aws-cli, jq-likes, uv)
+- `Dockerfile` – installs system tooling, Node via nvm, global TS/AI CLIs, poetry, Rust aliases
+- `.devcontainer/devcontainer.json` – adds features (docker-in-docker, aws-cli, rust, jq-likes, uv)
 
 Goals:
-- Single image for Python + TypeScript work
+- Single image for Python + TypeScript + Rust work
 - Minimal repeated logic (feature-first approach where possible)
 - Fast local single-arch builds; CI multi-arch publication
 
