@@ -15,7 +15,7 @@ multi-ecosystem-groups:
 updates:
   # 1. Dev Containers (devcontainer.json + Dockerfile FROM images + Feature version refs)
   - package-ecosystem: devcontainers
-    directory: /containers/base
+    directory: /containers/default
     schedule:
       interval: weekly
     # Attach to multi-ecosystem group so Dockerfile + devcontainer changes land together
@@ -30,7 +30,7 @@ updates:
 
   # 2. Docker (direct FROM image tags inside Dockerfile)
   - package-ecosystem: docker
-    directory: /containers/base
+    directory: /containers/default
     schedule:
       interval: weekly
     multi-ecosystem-group: dev-env

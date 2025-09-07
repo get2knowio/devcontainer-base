@@ -34,7 +34,7 @@ exec "$(dirname "$0")/scripts/<script-name>.sh" "$@"
 
 **Rule: Use a unified container approach with devcontainer features.**
 
-- **Unified Container**: Single container in `containers/base/` that includes all development tools (Python, TypeScript, Docker-in-Docker, etc.)
+- **Unified Container**: Single container in `containers/default/` that includes all development tools (Python, TypeScript, Docker-in-Docker, etc.)
 - **Features-Based**: Use DevContainer features instead of manual Dockerfile installations for better maintainability
 - **Clean Architecture**: Dockerfile focuses on core tools, devcontainer.json handles language-specific features
 
@@ -84,11 +84,11 @@ containers/
 
 2. **Modifying Build Process**:
    - Update `scripts/build.sh` 
-   - Test with the unified container in `containers/base/`
+   - Test with the unified container in `containers/default/`
 
 3. **DevContainer Changes**:
-   - Update configuration in `containers/base/devcontainer.json`
-   - Modify Dockerfile in `containers/base/Dockerfile` for custom tools only
+   - Update configuration in `containers/default/devcontainer.json`
+   - Modify Dockerfile in `containers/default/Dockerfile` for custom tools only
    - Use DevContainer features for language tools and standard services
    - Test with `./build` command
 

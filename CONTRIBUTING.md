@@ -17,7 +17,7 @@ This document explains how the unified devcontainer image is structured, built, 
 
 ---
 ## Overview
-Source lives under `containers/base/`:
+Source lives under `containers/default/`:
 - `Dockerfile` – installs system tooling, Node via nvm, global TS/AI CLIs, poetry, aliases
 - `.devcontainer/devcontainer.json` – adds features (docker-in-docker, aws-cli, jq-likes, uv)
 
@@ -47,7 +47,7 @@ Overridable Docker build args (see Dockerfile):
 
 Example:
 ```
-docker build --build-arg ACT_VERSION=v0.2.69 -t devcontainer:test containers/base
+docker build --build-arg ACT_VERSION=v0.2.69 -t devcontainer:test containers/default
 ```
 
 ## Test Workflow
